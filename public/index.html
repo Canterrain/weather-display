@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Clock Weather Display</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <div class="container">
+    <div class="time-section">
+      <div id="time"></div> <!-- EMPTY on load -->
+      <div id="day"></div>  <!-- EMPTY on load -->
+    </div>
+    <div class="weather-section">
+      <div class="current-weather">
+        <img id="current-icon" src="assets/icons/clear-day.svg" alt="Weather Icon"/>
+        <div class="temp-stack">
+          <div id="current-temp">--°</div>
+          <div id="high-low">
+            <div class="hl-row">
+              <span class="hl-label">H</span>
+              <span id="high">--°</span>
+            </div>
+            <div class="hl-row">
+              <span class="hl-label">L</span>
+              <span id="low">--°</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="forecast" class="forecast"></div>
+    </div>
+  </div>
+
+  <script src="renderer/clock.js"></script>
+  <script src="renderer/weather.js"></script>
+  <script>
+    const tryBackgrounds = ['background.jpg', 'background.webp', 'background.png'];
+    let applied = false;
+
+    for (const file of tryBackgrounds) {
+      const img = new Image();
+      img.src = `assets/${file}`;
+      img.onload = () => {
+        if (!applied) {
+          document.body.style.backgroundImage = `url(assets/${file})`;
+          applied = true;
+        }
+      };
+    }
+  </script>
+</body>
+</html>

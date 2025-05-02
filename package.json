@@ -1,0 +1,15 @@
+{
+  "name": "weather-display",
+  "version": "1.0.0",
+  "description": "Under-cabinet weather and time display",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0"
+  }
+}

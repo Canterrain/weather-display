@@ -1,0 +1,28 @@
+# Node and Electron
+node_modules/
+*.log
+npm-debug.log*
+
+# PM2 logs and runtime
+~/.pm2/
+pm2.log
+ecosystem.config.js
+
+# Local environment config
+config.json
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# Backup or editor files
+*.swp
+*.bak
+*~
+
+# Electron build output
+dist/
+out/
+
+# User-specific config
+public/config.json
