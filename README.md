@@ -24,12 +24,16 @@ A fullscreen clock and weather dashboard designed for Raspberry Pi with HDMI dis
 
 ## 🚀 Quick Start
 
-On your Raspberry Pi:
+* Download the install script
 
-```bash
-git clone https://github.com/Canterrain/weather-display.git
-cd weather-display
+```
+wget https://raw.githubusercontent.com/Canterrain/weather-display/main/setup.sh
+```
+```
 chmod +x setup.sh
+```
+* Install the software: 
+```
 ./setup.sh
 ```
 
@@ -99,7 +103,7 @@ To use your own custom icons:
 
 To launch manually during development:
 
-```bash
+```
 npm install
 npm start
 ```
@@ -112,7 +116,7 @@ This opens the Electron app in a resizable window.
 
 The setup script automatically configures PM2 to:
 
-```bash
+```
 pm2 start scripts/rwc.sh --name weather-display
 pm2 save
 pm2 startup
