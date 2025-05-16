@@ -12,7 +12,22 @@ body {
   background-repeat: no-repeat;
   color: white;
   font-family: 'Roboto Mono', monospace;
-  overflow: hidden;
+  	overflow: hidden;
+
+}
+/* background image CSS*/
+body.day-background {
+  	background-image: url('assets/background.jpg'), url('assets/background.png'), url('assets/background.webp');
+  	background-size: cover;
+  	background-position: center;
+  	color: #fff;
+}
+
+body.night-background {
+  	background-color: black;
+  	background-size: cover;
+  	background-position: center;
+  	color: #D9D9D6;
 }
 
 .container {
