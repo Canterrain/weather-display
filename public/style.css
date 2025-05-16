@@ -27,7 +27,7 @@ body.night-background {
   	background-color: black;
   	background-size: cover;
   	background-position: center;
-  	color: #D9D9D6;
+  	color: #C0C0C0;
 }
 
 .container {
@@ -86,7 +86,6 @@ body.night-background {
   font-weight: 400;
   line-height: 190px;
   margin: 0 0px;
-  color: white;
 }
 
 .flip-clock__spacer {
@@ -186,7 +185,6 @@ body.night-background {
 #high, #low {
   font-size: 75px;
   font-weight: 400;
-  color: #ccc;
 }
 
 /* Forecast Section */
