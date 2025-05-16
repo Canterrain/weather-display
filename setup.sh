@@ -10,7 +10,7 @@ read -p "Enter your city (e.g., Cincinnati,OH,US): " city
 read -p "Choose time format (12 or 24): " timeFormat
 read -p "Choose temperature units (imperial or metric): " units
 
-# Validate time format
+# 2. Validate time format
 if [[ "$timeFormat" != "12" && "$timeFormat" != "24" ]]; then
   timeFormat="12"
 fi
@@ -19,8 +19,12 @@ if [[ "$units" != "imperial" && "$units" != "metric" ]]; then
   units="imperial"
 fi
 
-# 2. Create config.json
-mkdir -p ~/weather-display
+# 3. Ensure fresh copy of weather-display
+echo "Cloning latest version of weather-display from GitHub..."
+rm -rf ~/weather-display
+git clone https://github.com/Canterrain/weather-display.git ~/weather-display
+
+# 4. Create config.json
 cat <<EOF > ~/weather-display/config.json
 {
   "apiKey": "$apiKey",
@@ -30,7 +34,7 @@ cat <<EOF > ~/weather-display/config.json
 }
 EOF
 
-# 3. Install system dependencies
+# 5. Install system dependencies
 echo "Installing system packages..."
 sudo apt-get update
 sudo apt-get install -y nodejs npm git xserver-xorg xinit wlr-randr
@@ -43,14 +47,14 @@ sudo apt-get remove -y unclutter || true
 sudo apt-get install -y unclutter-xfixes
 
 
-# 4. Install Node.js dependencies (MagicMirror matching versions)
+# 6. Install Node.js dependencies (MagicMirror matching versions)
 cd ~/weather-display || exit 1
 npm install electron@28 express@4 node-fetch@2
 
-# 5. Install PM2 globally
+# 7. Install PM2 globally
 sudo npm install -g pm2
 
-# 6. Create rotate_display.sh (for portrait-to-landscape rotation)
+# 8. Create rotate_display.sh (for portrait-to-landscape rotation)
 cat <<EOF > ~/weather-display/rotate_display.sh
 #!/bin/bash
 set -e
@@ -65,7 +69,7 @@ fi
 EOF
 chmod +x ~/weather-display/rotate_display.sh
 
-# 7. Setup systemd user service for rotation
+# 9. Setup systemd user service for rotation
 mkdir -p ~/.config/systemd/user
 cat <<EOF > ~/.config/systemd/user/rotate-display.service
 [Unit]
@@ -86,11 +90,11 @@ systemctl --user daemon-reexec
 systemctl --user daemon-reload
 systemctl --user enable rotate-display.service
 
-# 8. Make rwc.sh executable and start app via PM2
+# 10. Make rwc.sh executable and start app via PM2
 chmod +x ~/weather-display/scripts/rwc.sh
 pm2 start ~/weather-display/scripts/rwc.sh --name weather-display
 
-# 9. Enable PM2 to autostart at boot
+# 11. Enable PM2 to autostart at boot
 pm2StartupCmd=$(pm2 startup systemd -u $USER --hp /home/$USER | grep sudo)
 eval "$pm2StartupCmd"
 pm2 save
