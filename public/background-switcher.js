@@ -1,14 +1,23 @@
-(function () {
+function applyTimeBasedBackground() {
   const hour = new Date().getHours();
   const body = document.body;
 
-  if (hour >= 7 && hour < 21) {
-    // Between 7am and 8:59pm = Day
-    body.classList.remove('night-background');
+  const isDaytime = hour >= 7 && hour < 21;
+	// Between 7am and 6:59pm = Day
+	// Between 7pm and 6:59am = Night
+  // Remove both classes first
+  body.classList.remove('day-background', 'night-background');
+
+  // Then apply the appropriate one
+  if (isDaytime) {
     body.classList.add('day-background');
   } else {
-    // Between 9pm and 6:59am = Night
-    body.classList.remove('day-background');
     body.classList.add('night-background');
   }
-})();
+}
+
+// Run immediately
+applyTimeBasedBackground();
+
+// Then re-check every 15 minutes (900,000ms)
+setInterval(applyTimeBasedBackground, 15 * 60 * 1000);
