@@ -11,23 +11,23 @@ body {
   background-position: center center;
   background-repeat: no-repeat;
   color: white;
-  font-family: 'Roboto Mono', monospace;
-  	overflow: hidden;
+  font-family: 'Lucida Console', 'Lucida Sans Typewriter', 'Monaco', 'Courier New', 'monospace';
+    overflow: hidden;
 
 }
 /* background image CSS*/
 body.day-background {
-  	background-image: url('assets/background.jpg'), url('assets/background.png'), url('assets/background.webp');
-  	background-size: cover;
-  	background-position: center;
-  	color: #fff;
+    background-image: url('assets/background.jpg'), url('assets/background.png'), url('assets/background.webp');
+    background-size: cover;
+    background-position: center;
+    color: #fff;
 }
 
 body.night-background {
-  	background-color: black;
-  	background-size: cover;
-  	background-position: center;
-  	color: #C0C0C0;
+    background-color: black;
+    background-size: cover;
+    background-position: center;
+    color: #D9D9D6;
 }
 
 .container {
@@ -46,7 +46,7 @@ body.night-background {
   flex-direction: column;
   justify-content: flex-start;
   align-items: flex-start;
-  margin-top: 40px;
+  margin-top: 70px;
   margin-left: 60px;
 }
 
@@ -63,7 +63,7 @@ body.night-background {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 20px;
+  margin-right: 0px;
 }
 
 .flip-clock__card {
@@ -86,6 +86,7 @@ body.night-background {
   font-weight: 400;
   line-height: 190px;
   margin: 0 0px;
+  color: white;
 }
 
 .flip-clock__spacer {
@@ -123,15 +124,15 @@ body.night-background {
   flex-direction: column;
   align-items: flex-end;
   justify-content: flex-start;
-  margin-top: 40px;
+  margin-top: 30px;
   margin-left: auto;  
-  margin-right: 60px;      
+  margin-right: 50px;
 }
 
 .current-weather {
   display: flex;
   align-items: flex-start;
-  gap: 20px;
+  gap: 10px;
   margin-top: 0;
   padding-top: 0;
 }
@@ -140,15 +141,17 @@ body.night-background {
   height: 240px;
   width: 240px;
   align-self: flex-start;
-  margin: 0;
+  margin-top: 0px;
 }
 
 .temp-stack {
   display: flex;
   flex-direction: row;
   align-items: flex-end;
-  gap: 30px;
-  margin-bottom: 30px;
+  gap: 10px;
+  margin-top: 30px;
+  margin-bottom: 0px;
+  margin-right: 50px;
 }
 
 #current-temp {
@@ -185,6 +188,7 @@ body.night-background {
 #high, #low {
   font-size: 75px;
   font-weight: 400;
+  color: #ccc;
 }
 
 /* Forecast Section */
@@ -192,9 +196,9 @@ body.night-background {
   display: flex;
   justify-content: flex-end;
   gap: 50px;
-  margin-top: -20px;
-  margin-right: 20px;
-  margin-bottom: 20px;
+  margin-top: -30px;
+  margin-right: 60px;
+  margin-bottom: 30px;
 }
 
 .forecast-day {
@@ -211,7 +215,7 @@ body.night-background {
 .forecast-day img {
   height: 100px;
   width: 100px;
-  margin: 2px 0;
+  margin: 1px 0;
 }
 
 .forecast-day::after {
@@ -306,4 +310,3 @@ body.night-background {
   color: white;
   line-height: 140px;
 }
-
