@@ -24,20 +24,58 @@ echo "Cloning latest version of weather-display from GitHub..."
 rm -rf ~/weather-display
 git clone https://github.com/Canterrain/weather-display.git ~/weather-display
 
-# 4. Create config.json
+# 4. Resolve city -> lat/lon using OpenWeather Geocoding API
+echo "Resolving location to latitude/longitude..."
+geo_json=$(python3 - <<PY
+import json, urllib.parse, urllib.request, sys
+
+api_key = ${apiKey@Q}
+city = ${city@Q}
+
+url = "https://api.openweathermap.org/geo/1.0/direct?q={}&limit=1&appid={}".format(
+    urllib.parse.quote(city), urllib.parse.quote(api_key)
+)
+
+try:
+    with urllib.request.urlopen(url, timeout=10) as r:
+        data = json.load(r)
+except Exception:
+    data = []
+
+if not data:
+    print("")
+    sys.exit(0)
+
+print(json.dumps({"lat": data[0].get("lat"), "lon": data[0].get("lon")}))
+PY
+)
+
+lat=$(echo "$geo_json" | python3 -c "import sys, json; s=sys.stdin.read().strip(); print(json.loads(s).get('lat','') if s else '')")
+lon=$(echo "$geo_json" | python3 -c "import sys, json; s=sys.stdin.read().strip(); print(json.loads(s).get('lon','') if s else '')")
+
+if [[ -z "$lat" || -z "$lon" ]]; then
+  echo "Warning: Could not resolve lat/lon for '$city'."
+  echo "The app will still run, but Open-Meteo highs/lows may not work until lat/lon is set."
+fi
+
+# 5. Create config.json (now includes lat/lon + timezone)
 cat <<EOF > ~/weather-display/config.json
 {
   "apiKey": "$apiKey",
   "location": "$city",
+  "lat": ${lat:-null},
+  "lon": ${lon:-null},
+  "timezone": "auto",
   "units": "$units",
   "timeFormat": "$timeFormat"
 }
 EOF
 
-# 5. Install system dependencies
+# 6. Install system dependencies
 echo "Installing system packages..."
 sudo apt-get update
 sudo apt-get install -y nodejs npm git xserver-xorg xinit wlr-randr
+
 # Download and install Roboto Mono font manually
 echo "Installing Roboto Mono font..."
 mkdir -p ~/.fonts
@@ -46,15 +84,14 @@ fc-cache -fv
 sudo apt-get remove -y unclutter || true
 sudo apt-get install -y unclutter-xfixes
 
-
-# 6. Install Node.js dependencies (MagicMirror matching versions)
+# 7. Install Node.js dependencies
 cd ~/weather-display || exit 1
-npm install electron@28 express@4 node-fetch@2
+npm install electron@28 express@4 node-fetch@2 abort-controller
 
-# 7. Install PM2 globally
+# 8. Install PM2 globally
 sudo npm install -g pm2
 
-# 8. Create rotate_display.sh (for portrait-to-landscape rotation)
+# 9. Create rotate_display.sh (for portrait-to-landscape rotation)
 cat <<EOF > ~/weather-display/rotate_display.sh
 #!/bin/bash
 set -e
@@ -69,7 +106,7 @@ fi
 EOF
 chmod +x ~/weather-display/rotate_display.sh
 
-# 9. Setup systemd user service for rotation
+# 10. Setup systemd user service for rotation
 mkdir -p ~/.config/systemd/user
 cat <<EOF > ~/.config/systemd/user/rotate-display.service
 [Unit]
@@ -90,15 +127,14 @@ systemctl --user daemon-reexec
 systemctl --user daemon-reload
 systemctl --user enable rotate-display.service
 
-# 10. Make rwc.sh executable and start app via PM2
+# 11. Make rwc.sh executable and start app via PM2
 chmod +x ~/weather-display/scripts/rwc.sh
 pm2 start ~/weather-display/scripts/rwc.sh --name weather-display
 
-# 11. Enable PM2 to autostart at boot
+# 12. Enable PM2 to autostart at boot
 pm2StartupCmd=$(pm2 startup systemd -u $USER --hp /home/$USER | grep sudo)
 eval "$pm2StartupCmd"
 pm2 save
-
 
 echo "---------------------------------------"
 echo " Setup complete! Please REBOOT to apply."
