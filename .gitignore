@@ -17,4 +17,8 @@ build/
 
 # Local backups
 *.bak
-config.json
+
+# Local config / secrets
+config*.json
+!config.example.json
+
