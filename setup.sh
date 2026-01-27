@@ -76,22 +76,27 @@ echo "Installing system packages..."
 sudo apt-get update
 sudo apt-get install -y nodejs npm git xserver-xorg xinit wlr-randr
 
-# Download and install Roboto Mono font manually
+# 7. Fonts
 echo "Installing Roboto Mono font..."
-mkdir -p ~/.fonts
-wget -O ~/.fonts/RobotoMono-Regular.ttf https://github.com/google/fonts/raw/main/apache/robotomono/RobotoMono-Regular.ttf
+
+mkdir -p ~/.local/share/fonts/RobotoMono
+
+cp fonts/RobotoMono/*.ttf ~/.local/share/fonts/RobotoMono/ 2>/dev/null || true
+
 fc-cache -fv
+
+# 8. Hide mouse cursor (kiosk mode)
 sudo apt-get remove -y unclutter || true
 sudo apt-get install -y unclutter-xfixes
 
-# 7. Install Node.js dependencies
+# 9. Install Node.js dependencies
 cd ~/weather-display || exit 1
 npm install electron@28 express@4 node-fetch@2 abort-controller
 
-# 8. Install PM2 globally
+# 10. Install PM2 globally
 sudo npm install -g pm2
 
-# 9. Create rotate_display.sh (for portrait-to-landscape rotation)
+# 11. Create rotate_display.sh (for portrait-to-landscape rotation)
 cat <<EOF > ~/weather-display/rotate_display.sh
 #!/bin/bash
 set -e
@@ -106,7 +111,7 @@ fi
 EOF
 chmod +x ~/weather-display/rotate_display.sh
 
-# 10. Setup systemd user service for rotation
+# 12. Setup systemd user service for rotation
 mkdir -p ~/.config/systemd/user
 cat <<EOF > ~/.config/systemd/user/rotate-display.service
 [Unit]
@@ -127,11 +132,11 @@ systemctl --user daemon-reexec
 systemctl --user daemon-reload
 systemctl --user enable rotate-display.service
 
-# 11. Make rwc.sh executable and start app via PM2
+# 13. Make rwc.sh executable and start app via PM2
 chmod +x ~/weather-display/scripts/rwc.sh
 pm2 start ~/weather-display/scripts/rwc.sh --name weather-display
 
-# 12. Enable PM2 to autostart at boot
+# 14. Enable PM2 to autostart at boot
 pm2StartupCmd=$(pm2 startup systemd -u $USER --hp /home/$USER | grep sudo)
 eval "$pm2StartupCmd"
 pm2 save
