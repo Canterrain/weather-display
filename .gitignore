@@ -17,3 +17,4 @@ build/
 
 # Local backups
 *.bak
+config.json
