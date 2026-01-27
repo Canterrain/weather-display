@@ -1,0 +1,313 @@
+html {
+  cursor: none;
+}
+
+body {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  background-color: black;
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  color: white;
+  font-family: 'Lucida Console', 'Lucida Sans Typewriter', 'Monaco', 'Courier New', 'monospace';
+  	overflow: hidden;
+
+}
+/* background image CSS*/
+body.day-background {
+  	background-image: url('assets/background.jpg'), url('assets/background.png'), url('assets/background.webp');
+  	background-size: cover;
+  	background-position: center;
+  	color: #fff;
+}
+
+body.night-background {
+  	background-color: black;
+  	background-size: cover;
+  	background-position: center;
+  	color: #D9D9D6;
+}
+
+.container {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: flex-start;
+  height: 100vh;
+  width: 100vw;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.time-section {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  margin-top: 70px;
+  margin-left: 60px;
+}
+
+#time {
+  display: flex;
+  font-size: 210px;
+  font-weight: 400;
+  line-height: 190px;
+  margin-bottom: 0;
+  align-items: center;
+}
+
+.flip-clock__piece {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 0px;
+}
+
+.flip-clock__card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card__top {
+  display: inline-block;
+  transition: transform 0.4s ease-in-out;
+}
+
+.flip-text {
+  transform: rotateX(360deg);
+}
+
+.flip-clock__colon {
+  font-size: 210px;
+  font-weight: 400;
+  line-height: 190px;
+  margin: 0 0px;
+  color: white;
+}
+
+.flip-clock__spacer {
+  font-size: 210px;
+  font-weight: 400;
+  line-height: 190px;
+  margin: 0 0px;
+}
+
+#day {
+  font-size: 110px;
+  font-weight: 400;
+  color: #white;
+  margin-top: 10px;
+  white-space: nowrap;
+}
+
+.day-name {
+  margin-right: 0px;
+}
+
+.month-name {
+  margin-left: 30px;
+}
+
+.date-number {
+  margin-left: 30px; 
+}
+
+
+
+/* Weather Section */
+.weather-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-start;
+  margin-top: 30px;
+  margin-left: auto;  
+  margin-right: 50px;
+}
+
+.current-weather {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.current-weather img {
+  height: 240px;
+  width: 240px;
+  align-self: flex-start;
+  margin-top: 0px;
+}
+
+.temp-stack {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 10px;
+	margin-top: 30px;
+  margin-bottom: 0px;
+	margin-right: 50px;
+}
+
+#current-temp {
+  font-size: 170px;
+  font-weight: 400;
+  margin: 0;
+  padding: 0;
+  line-height: 1;
+  align-self: flex-start;
+}
+
+#high-low {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 12px;
+}
+
+.hl-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.hl-label {
+  font-size: 70px;
+  font-weight: 400;
+  color: #ccc;
+  line-height: 1;
+}
+
+#high, #low {
+  font-size: 75px;
+  font-weight: 400;
+  color: #ccc;
+}
+
+/* Forecast Section */
+.forecast {
+  display: flex;
+  justify-content: flex-end;
+  gap: 50px;
+  margin-top: -30px;
+  margin-right: 60px;
+  margin-bottom: 30px;
+}
+
+.forecast-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  position: relative;
+  padding-top: 0px;
+  text-align: center;
+  font-size: 35px;
+}
+
+.forecast-day img {
+  height: 100px;
+  width: 100px;
+  margin: 1px 0;
+}
+
+.forecast-day::after {
+  content: "";
+  position: absolute;
+  right: -25px;
+  top: 10%;
+  height: 80%;
+  width: 2px;
+  background-color: #777;
+  opacity: 0.7;
+}
+
+.forecast-day:last-child::after {
+  display: none;
+}
+
+/* Flip Clock Layout */
+.flip-clock {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: 'Roboto Mono', monospace;
+}
+
+.flip-digit {
+  position: relative;
+  width: 100px;
+  height: 140px;
+  perspective: 800px;
+}
+
+.digit-card {
+  position: absolute;
+  width: 100%;
+  height: 50%;
+  overflow: hidden;
+  background: black;
+  color: white;
+  font-size: 120px;
+  line-height: 140px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  backface-visibility: hidden;
+}
+
+.digit-top {
+  top: 0;
+  border-bottom: 1px solid #333;
+  z-index: 2;
+}
+
+.digit-bottom {
+  bottom: 0;
+  border-top: 1px solid #333;
+  z-index: 1;
+}
+
+.flip-top {
+  position: absolute;
+  top: 0;
+  height: 50%;
+  transform-origin: bottom;
+  animation: flipDown 0.6s forwards;
+  z-index: 5;
+}
+
+.flip-bottom {
+  position: absolute;
+  bottom: 0;
+  height: 50%;
+  transform-origin: top;
+  transform: rotateX(90deg);
+  animation: flipUp 0.6s forwards;
+  z-index: 4;
+}
+
+@keyframes flipDown {
+  0% { transform: rotateX(0deg); }
+  100% { transform: rotateX(-90deg); }
+}
+
+@keyframes flipUp {
+  0% { transform: rotateX(90deg); }
+  100% { transform: rotateX(0deg); }
+}
+
+.colon, .ampm {
+  font-size: 100px;
+  padding: 0 10px;
+  color: white;
+  line-height: 140px;
+}
+
