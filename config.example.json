@@ -1,8 +1,7 @@
 {
-  "apiKey": "YOUR_API_KEY",
-  "location": "City,ST,CC",
-  "lat": null,
-  "lon": null,
+  "location": "Cincinnati,OH,US",
+  "lat": xx.xx,
+  "lon": -xx.xxx,
   "timezone": "auto",
   "units": "imperial",
   "timeFormat": "12"
