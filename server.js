@@ -156,7 +156,7 @@ app.get('/weather', async (req, res) => {
     for (let i = 1; i <= 4; i++) {
       const max = Math.round(daily.temperature_2m_max[i]);
       const min = Math.round(daily.temperature_2m_min[i]);
-      const mid = Math.round((max + min) / 2);
+      const mid = max; // show daily high
       const code = Number(daily.weathercode[i]);
 
       // For daily forecast icons, use day-style icons (is_day=true).
