@@ -11,7 +11,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const configPath = path.join(__dirname, 'config.json');
 
-// Load config (we'll also re-read on demand if we update it)
 function loadConfig() {
   if (!fs.existsSync(configPath)) return null;
   return JSON.parse(fs.readFileSync(configPath, 'utf8'));
@@ -34,75 +33,71 @@ async function fetchWithTimeout(url, ms = 10000) {
   }
 }
 
-// Format: YYYY-MM-DD for a unix timestamp shifted by tzOffsetSeconds
-function dateKeyFromUnixWithTz(dtSeconds, tzOffsetSeconds) {
-  const d = new Date((dtSeconds + tzOffsetSeconds) * 1000);
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(d.getUTCDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-// Geocode "City,ST,CC" -> {lat, lon} using OpenWeather geocoding (and persist to config.json)
-async function ensureLatLon(cfg) {
-  if (typeof cfg.lat === 'number' && typeof cfg.lon === 'number') return cfg;
-
-  const geoUrl = `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(cfg.location)}&limit=1&appid=${cfg.apiKey}`;
-  const geoResp = await fetchWithTimeout(geoUrl, 10000);
-  const geoData = await geoResp.json();
-
-  if (!geoResp.ok || !Array.isArray(geoData) || geoData.length === 0) {
-    throw new Error(`Geocoding failed for location "${cfg.location}"`);
-  }
-
-  const lat = geoData[0].lat;
-  const lon = geoData[0].lon;
-
-  if (typeof lat !== 'number' || typeof lon !== 'number') {
-    throw new Error(`Geocoding returned invalid lat/lon for "${cfg.location}"`);
-  }
-
-  // Persist to config.json so future runs don't need geocoding
-  const updated = { ...cfg, lat, lon };
-  fs.writeFileSync(configPath, JSON.stringify(updated, null, 2));
-  return updated;
-}
-
-// Fetch daily hi/lo from Open-Meteo for "today"
-async function fetchOpenMeteoTodayHiLo(cfg) {
-  const tz = cfg.timezone || 'auto';
-
-  // Map config.units -> Open-Meteo temperature_unit
-  const temperatureUnit = cfg.units === 'metric' ? 'celsius' : 'fahrenheit';
-
-  // One-day daily forecast is enough for today
+// --- Open-Meteo geocoding: "City,ST,CC" -> {lat, lon, timezone} ---
+async function geocodeLocation(location) {
   const url =
-    `https://api.open-meteo.com/v1/forecast` +
-    `?latitude=${encodeURIComponent(cfg.lat)}` +
-    `&longitude=${encodeURIComponent(cfg.lon)}` +
-    `&daily=temperature_2m_max,temperature_2m_min` +
-    `&temperature_unit=${encodeURIComponent(temperatureUnit)}` +
-    `&timezone=${encodeURIComponent(tz)}` +
-    `&forecast_days=1`;
+    `https://geocoding-api.open-meteo.com/v1/search` +
+    `?name=${encodeURIComponent(location)}` +
+    `&count=1&language=en&format=json`;
 
   const resp = await fetchWithTimeout(url, 10000);
   const data = await resp.json();
 
-  if (!resp.ok) {
-    throw new Error(`Open-Meteo fetch failed: ${JSON.stringify(data).slice(0, 200)}`);
+  if (!resp.ok || !data || !Array.isArray(data.results) || data.results.length === 0) {
+    throw new Error(`Geocoding failed for location "${location}"`);
   }
 
-  const maxArr = data?.daily?.temperature_2m_max;
-  const minArr = data?.daily?.temperature_2m_min;
+  const r = data.results[0];
 
-  if (!Array.isArray(maxArr) || !Array.isArray(minArr) || maxArr.length < 1 || minArr.length < 1) {
-    throw new Error('Open-Meteo response missing daily temperature arrays');
+  if (typeof r.latitude !== 'number' || typeof r.longitude !== 'number') {
+    throw new Error(`Geocoding returned invalid lat/lon for "${location}"`);
   }
 
   return {
-    high: Math.round(maxArr[0]),
-    low: Math.round(minArr[0]),
+    lat: r.latitude,
+    lon: r.longitude,
+    timezone: r.timezone || 'auto',
+    resolvedName: [r.name, r.admin1, r.country_code].filter(Boolean).join(', ')
   };
+}
+
+async function ensureLatLonTimezone(cfg) {
+  const hasLatLon = typeof cfg.lat === 'number' && typeof cfg.lon === 'number';
+  const hasTz = typeof cfg.timezone === 'string' && cfg.timezone.length > 0;
+
+  if (hasLatLon && hasTz) return cfg;
+
+  const geo = await geocodeLocation(cfg.location);
+
+  const updated = {
+    ...cfg,
+    lat: geo.lat,
+    lon: geo.lon,
+    timezone: geo.timezone || 'auto'
+  };
+
+  // Persist so future runs don’t need geocoding
+  fs.writeFileSync(configPath, JSON.stringify(updated, null, 2));
+  return updated;
+}
+
+function temperatureUnitFromCfg(cfg) {
+  return cfg.units === 'metric' ? 'celsius' : 'fahrenheit';
+}
+
+// Infer "thundersnow":
+// If Open-Meteo says thunderstorm (95/96/99) AND it's cold enough,
+// show thundersnow icon. Threshold is configurable via config.thundersnowF / thundersnowC.
+function isThundersnow(cfg, weathercode, tempNow, tempUnit) {
+  const thunderCodes = [95, 96, 99];
+  if (!thunderCodes.includes(weathercode)) return false;
+
+  // default threshold: <= 34°F (or <= 1°C) is a decent “likely snow mix” heuristic
+  const thresholdF = typeof cfg.thundersnowF === 'number' ? cfg.thundersnowF : 34;
+  const thresholdC = typeof cfg.thundersnowC === 'number' ? cfg.thundersnowC : 1;
+
+  if (tempUnit === 'fahrenheit') return tempNow <= thresholdF;
+  return tempNow <= thresholdC;
 }
 
 app.get('/weather', async (req, res) => {
@@ -110,85 +105,84 @@ app.get('/weather', async (req, res) => {
   if (!config) return res.status(500).json({ error: 'Missing config.json' });
 
   try {
-    // Ensure lat/lon exist for Open-Meteo (writes back into config if needed)
-    const cfg = await ensureLatLon(config);
+    const cfg = await ensureLatLonTimezone(config);
+    const tempUnit = temperatureUnitFromCfg(cfg);
 
-    const currentUrl =
-      `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(cfg.location)}` +
-      `&appid=${cfg.apiKey}&units=${cfg.units}`;
+    // We request:
+    // - current: temp, weathercode, is_day
+    // - daily: max/min and weathercode (today + next 4)
+    const url =
+      `https://api.open-meteo.com/v1/forecast` +
+      `?latitude=${encodeURIComponent(cfg.lat)}` +
+      `&longitude=${encodeURIComponent(cfg.lon)}` +
+      `&current_weather=true` +
+      `&daily=temperature_2m_max,temperature_2m_min,weathercode` +
+      `&temperature_unit=${encodeURIComponent(tempUnit)}` +
+      `&timezone=${encodeURIComponent(cfg.timezone || 'auto')}` +
+      `&forecast_days=5`;
 
-    const forecastUrl =
-      `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(cfg.location)}` +
-      `&appid=${cfg.apiKey}&units=${cfg.units}`;
+    const resp = await fetchWithTimeout(url, 10000);
+    const data = await resp.json();
 
-    // Parallel: OpenWeather current+forecast, and Open-Meteo daily hi/lo
-    const [currentResp, forecastResp, meteoHiLo] = await Promise.all([
-      fetchWithTimeout(currentUrl, 10000),
-      fetchWithTimeout(forecastUrl, 10000),
-      fetchOpenMeteoTodayHiLo(cfg),
-    ]);
-
-    const currentData = await currentResp.json();
-    const forecastData = await forecastResp.json();
-
-    if (!currentResp.ok || !forecastResp.ok) {
-      console.error('OpenWeather fetch error', currentData, forecastData);
-
+    if (!resp.ok) {
+      console.error('Open-Meteo fetch error', data);
       if (lastGoodPayload) {
         return res.json({ ...lastGoodPayload, stale: true, staleAgeMs: Date.now() - lastGoodAt });
       }
-
       return res.status(500).json({ error: 'Weather fetch failed' });
     }
 
-    // Build simplified forecast (next 4 days, skip "today" in the city's timezone)
-    const dailyForecast = [];
+    const cur = data.current_weather;
+    const daily = data.daily;
 
-    const tzOffset = (forecastData.city && typeof forecastData.city.timezone === 'number')
-      ? forecastData.city.timezone
-      : 0;
+    if (!cur || !daily) {
+      throw new Error('Open-Meteo response missing current_weather or daily');
+    }
 
-    const todayKey = dateKeyFromUnixWithTz(Math.floor(Date.now() / 1000), tzOffset);
+    const highToday = Math.round(daily.temperature_2m_max[0]);
+    const lowToday = Math.round(daily.temperature_2m_min[0]);
 
-    const forecastsByDay = {};
-    (forecastData.list || []).forEach(entry => {
-      const key = dateKeyFromUnixWithTz(entry.dt, tzOffset);
-      (forecastsByDay[key] ??= []).push(entry);
-    });
+    const currentTemp = Math.round(cur.temperature);
+    const currentCode = Number(cur.weathercode);
+    const isDay = cur.is_day === 1;
 
-    const forecastKeys = Object.keys(forecastsByDay).sort();
+    const currentThundersnow = isThundersnow(cfg, currentCode, currentTemp, tempUnit);
 
-    for (const dateKey of forecastKeys) {
-      if (dateKey === todayKey) continue;
+    // OPTIONAL: prevent visually-odd “current > high” by clamping high/low to include current
+    const fixedHigh = Math.max(highToday, currentTemp);
+    const fixedLow = Math.min(lowToday, currentTemp);
 
-      const entries = forecastsByDay[dateKey];
+    const forecast = [];
+    for (let i = 1; i <= 4; i++) {
+      const max = Math.round(daily.temperature_2m_max[i]);
+      const min = Math.round(daily.temperature_2m_min[i]);
+      const mid = Math.round((max + min) / 2);
+      const code = Number(daily.weathercode[i]);
 
-      // Choose a midday-ish entry for that day
-      const middayEntry =
-        entries.find(e => {
-          const hour = new Date((e.dt + tzOffset) * 1000).getUTCHours();
-          return hour >= 11 && hour <= 13;
-        }) || entries[Math.floor(entries.length / 2)];
+      // For daily forecast icons, use day-style icons (is_day=true).
+      // Thundersnow for forecast: infer using the *mid* temp (you could choose min instead).
+      const thundersnow = isThundersnow(cfg, code, mid, tempUnit);
 
-      dailyForecast.push({
-        temp: Math.round(middayEntry.main.temp),
-        icon: middayEntry.weather[0].icon,
-        main: middayEntry.weather[0].main
+      forecast.push({
+        temp: mid,
+        high: max,
+        low: min,
+        code,
+        is_day: true,
+        thundersnow
       });
-
-      if (dailyForecast.length >= 4) break;
     }
 
     const payload = {
       current: {
-        temp: Math.round(currentData.main.temp),
-        // Hybrid: stable daily high/low from Open-Meteo
-        high: meteoHiLo.high,
-        low: meteoHiLo.low,
-        main: currentData.weather[0].main,
-        icon: currentData.weather[0].icon
+        temp: currentTemp,
+        high: fixedHigh,
+        low: fixedLow,
+        code: currentCode,
+        is_day: isDay,
+        thundersnow: currentThundersnow
       },
-      forecast: dailyForecast
+      forecast
     };
 
     lastGoodPayload = payload;

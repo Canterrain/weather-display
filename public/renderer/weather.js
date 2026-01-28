@@ -15,9 +15,8 @@ async function fetchWeather() {
     document.getElementById('high').textContent = `${current.high}°`;
     document.getElementById('low').textContent = `${current.low}°`;
 
-
-    let iconKey = mapIcon(current.main, current.icon);
-    document.getElementById('current-icon').src = `assets/icons/${iconKey}.svg`;
+    const currentIconKey = mapIconFromMeteo(current.code, current.is_day, current.thundersnow);
+    document.getElementById('current-icon').src = `assets/icons/${currentIconKey}.svg`;
 
     // Update forecast
     const forecastContainer = document.getElementById('forecast');
@@ -28,14 +27,14 @@ async function fetchWeather() {
       dayDiv.className = 'forecast-day';
 
       const dayName = new Date();
-      dayName.setDate(dayName.getDate() + index + 1); // Tomorrow + following
+      dayName.setDate(dayName.getDate() + index + 1);
       const weekday = dayName.toLocaleDateString('en-US', { weekday: 'short' });
 
-      let forecastIconKey = mapIcon(day.main, day.icon);
+      const iconKey = mapIconFromMeteo(day.code, day.is_day, day.thundersnow);
 
       dayDiv.innerHTML = `
         <div>${weekday}</div>
-        <img src="assets/icons/${forecastIconKey}.svg" alt="Weather Icon"/>
+        <img src="assets/icons/${iconKey}.svg" alt="Weather Icon"/>
         <div>${day.temp}°</div>
       `;
       forecastContainer.appendChild(dayDiv);
@@ -46,27 +45,50 @@ async function fetchWeather() {
   }
 }
 
-function mapIcon(main, iconCode) {
-  if (main === "Clear") {
-    return iconCode.endsWith("n") ? "clear-night" : "clear-day";
-  } else if (main === "Clouds") {
-    if (iconCode.startsWith("02")) return iconCode.endsWith("n") ? "partlycloudy-night" : "partlycloudy-day";
-    else return "cloudy";
-  } else if (main === "Rain" || main === "Drizzle") {
-    if (iconCode.startsWith("09")) return iconCode.endsWith("n") ? "showers-night" : "showers-day";
-    else return "rain";
-  } else if (main === "Thunderstorm") {
-    return "thunderstorm";
-  } else if (main === "Snow") {
-    return "snow";
-  } else if (["Mist", "Fog", "Smoke", "Haze"].includes(main)) {
-    return "fog";
-  } else if (main === "Sleet") {
-    return "sleet";
-  } else {
-    return "cloudy"; // fallback
-  }
+// Map Open-Meteo weathercode (+ is_day) to your icon filenames.
+// Your existing names used below:
+// clear-day, clear-night, partlycloudy-day, partlycloudy-night, cloudy,
+// fog, rain, showers-day, showers-night, sleet, snow, thunderstorm, thundersnow
+function mapIconFromMeteo(code, isDay, thundersnow) {
+  // If we inferred thundersnow, override everything.
+  if (thundersnow) return "thundersnow";
+
+  // 0: Clear sky
+  if (code === 0) return isDay ? "clear-day" : "clear-night";
+
+  // 1-2: Mainly clear, partly cloudy
+  if (code === 1 || code === 2) return isDay ? "partlycloudy-day" : "partlycloudy-night";
+
+  // 3: Overcast
+  if (code === 3) return "cloudy";
+
+  // 45,48: Fog / depositing rime fog
+  if (code === 45 || code === 48) return "fog";
+
+  // 51-57: Drizzle (incl freezing drizzle) -> treat as showers
+  if (code >= 51 && code <= 57) return isDay ? "showers-day" : "showers-night";
+
+  // 61-65: Rain
+  if (code >= 61 && code <= 65) return "rain";
+
+  // 66-67: Freezing rain -> sleet icon (closest you have)
+  if (code === 66 || code === 67) return "sleet";
+
+  // 71-77: Snow fall / snow grains
+  if (code >= 71 && code <= 77) return "snow";
+
+  // 80-82: Rain showers
+  if (code >= 80 && code <= 82) return isDay ? "showers-day" : "showers-night";
+
+  // 85-86: Snow showers
+  if (code === 85 || code === 86) return "snow";
+
+  // 95: Thunderstorm (slight/moderate)
+  // 96-99: Thunderstorm with hail
+  if (code === 95 || code === 96 || code === 99) return "thunderstorm";
+
+  return "cloudy";
 }
 
 fetchWeather();
-setInterval(fetchWeather, 30 * 60 * 1000); // Update every 30 minutes
+setInterval(fetchWeather, 30 * 60 * 1000);
