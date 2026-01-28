@@ -5,7 +5,7 @@ echo "-------------------------------"
 echo "Clock Weather Display Setup"
 echo "-------------------------------"
 
-# 1. Prompt for config (NO OpenWeather key anymore)
+# 1. Prompt for config 
 read -p "Enter your city (e.g., Cincinnati,OH,US): " city
 read -p "Choose time format (12 or 24): " timeFormat
 read -p "Choose temperature units (imperial or metric): " units
