@@ -232,5 +232,5 @@ fi
 pm2 save
 
 echo "---------------------------------------"
-echo " Setup complete!
+echo " Setup complete!"
 echo "---------------------------------------"
