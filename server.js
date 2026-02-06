@@ -206,7 +206,7 @@ app.get('/weather', async (req, res) => {
     const forecast = [];
     // We want "tomorrow + next 5" => 6 days total (Sat -> Thu, etc.)
     // daily arrays include "today" at [0], so we start at 1.
-    for (let i = 1; i <= 6; i++) {
+    for (let i = 1; i <= 5; i++) {
       const maxRaw = daily.temperature_2m_max[i];
       const minRaw = daily.temperature_2m_min[i];
       const codeRaw = daily.weathercode[i];
