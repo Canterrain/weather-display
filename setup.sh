@@ -156,7 +156,7 @@ cat <<EOF > ~/weather-display/config.json
   "units": "$units",
   "timeFormat": "$timeFormat",
   "thundersnowF": 34,
-  "thundersnowC": 1
+  "thundersnowC": 1,
   "recentSnowHours": 2,
   "recentSnowMm": 0
 }
@@ -232,5 +232,5 @@ fi
 pm2 save
 
 echo "---------------------------------------"
-echo " Setup complete! Please REBOOT to apply."
+echo " Setup complete!
 echo "---------------------------------------"
