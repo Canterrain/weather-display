@@ -22,3 +22,7 @@ build/
 config*.json
 !config.example.json
 
+# User-provided background overrides
+public/assets/background.jpg
+public/assets/background.png
+public/assets/background.webp
