@@ -212,6 +212,15 @@ app.get('/weather', async (req, res) => {
       const mid = Math.round((max + min) / 2);
 
       const code = Number(daily.weathercode[i]);
+
+      // Bail out cleanly if Open-Meteo didn’t give us this day
+      if (maxRaw == null || minRaw == null || codeRaw == null) continue;
+      
+      const max = Math.round(maxRaw);
+      const min = Math.round(minRaw);
+      const mid = Math.round((max + min) / 2);
+      const code = Number(codeRaw);
+      
       const thundersnow = isThundersnow(cfg, code, mid, tempUnit);
 
       forecast.push({
