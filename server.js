@@ -76,7 +76,6 @@ async function ensureLatLonTimezone(cfg) {
     timezone: geo.timezone || 'auto'
   };
 
-  // Persist so future runs don’t need geocoding
   fs.writeFileSync(configPath, JSON.stringify(updated, null, 2));
   return updated;
 }
@@ -85,19 +84,72 @@ function temperatureUnitFromCfg(cfg) {
   return cfg.units === 'metric' ? 'celsius' : 'fahrenheit';
 }
 
-// Infer "thundersnow":
 // If Open-Meteo says thunderstorm (95/96/99) AND it's cold enough,
-// show thundersnow icon. Threshold is configurable via config.thundersnowF / thundersnowC.
+// show thundersnow icon. Threshold configurable via config.thundersnowF / thundersnowC.
 function isThundersnow(cfg, weathercode, tempNow, tempUnit) {
   const thunderCodes = [95, 96, 99];
   if (!thunderCodes.includes(weathercode)) return false;
 
-  // default threshold: <= 34°F (or <= 1°C) is a decent “likely snow mix” heuristic
   const thresholdF = typeof cfg.thundersnowF === 'number' ? cfg.thundersnowF : 34;
   const thresholdC = typeof cfg.thundersnowC === 'number' ? cfg.thundersnowC : 1;
 
   if (tempUnit === 'fahrenheit') return tempNow <= thresholdF;
   return tempNow <= thresholdC;
+}
+
+// Recent snow override:
+// If snowfall > 0 in the last N hours, force current weathercode to "snow" family
+function applyRecentSnowOverride(cfg, currentCode, isDay, hourly, nowIso) {
+  const recentHours = typeof cfg.recentSnowHours === 'number' ? cfg.recentSnowHours : 2;
+  const snowThreshold = typeof cfg.recentSnowMm === 'number' ? cfg.recentSnowMm : 0; // treat any >0 as snow by default
+
+  const times = hourly?.time;
+  const snowfall = hourly?.snowfall;
+  const codes = hourly?.weathercode;
+
+  if (!Array.isArray(times) || !Array.isArray(snowfall) || !Array.isArray(codes)) {
+    return currentCode;
+  }
+
+  // Find nearest hourly index to nowIso (current_weather.time is often :45, hourly is :00)
+  const parse = (s) => new Date(s).getTime();
+  const nowT = parse(nowIso);
+  if (!Number.isFinite(nowT)) return currentCode;
+
+  let bestI = -1;
+  let bestDiff = Infinity;
+  for (let i = 0; i < times.length; i++) {
+    const t = parse(times[i]);
+    if (!Number.isFinite(t)) continue;
+    const diff = Math.abs(t - nowT);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      bestI = i;
+    }
+  }
+  if (bestI < 0) return currentCode;
+
+  const windowCount = Math.max(0, Math.min(times.length, recentHours + 1)); // include current hour + N previous
+  const startI = Math.max(0, bestI - recentHours);
+
+  let sawSnow = false;
+  let sawSnowCode = false;
+
+  for (let i = startI; i <= bestI; i++) {
+    const s = Number(snowfall[i] ?? 0);
+    const c = Number(codes[i] ?? -1);
+
+    if (s > snowThreshold) sawSnow = true;
+
+    // Snow-ish codes in Open-Meteo: 71-77, 85-86
+    if ((c >= 71 && c <= 77) || c === 85 || c === 86) sawSnowCode = true;
+  }
+
+  if (!sawSnow && !sawSnowCode) return currentCode;
+
+  // If we saw snow recently, choose a reasonable snow code for the icon mapping.
+  // 73 = moderate snow fall (works with your mapping -> snow)
+  return 73;
 }
 
 app.get('/weather', async (req, res) => {
@@ -108,14 +160,13 @@ app.get('/weather', async (req, res) => {
     const cfg = await ensureLatLonTimezone(config);
     const tempUnit = temperatureUnitFromCfg(cfg);
 
-    // We request:
-    // - current: temp, weathercode, is_day
-    // - daily: max/min and weathercode (today + next 4)
+    // Pull daily + current + hourly so we can do “recent snow” override for current icon
     const url =
       `https://api.open-meteo.com/v1/forecast` +
       `?latitude=${encodeURIComponent(cfg.lat)}` +
       `&longitude=${encodeURIComponent(cfg.lon)}` +
       `&current_weather=true` +
+      `&hourly=weathercode,snowfall` +
       `&daily=temperature_2m_max,temperature_2m_min,weathercode` +
       `&temperature_unit=${encodeURIComponent(tempUnit)}` +
       `&timezone=${encodeURIComponent(cfg.timezone || 'auto')}` +
@@ -134,33 +185,33 @@ app.get('/weather', async (req, res) => {
 
     const cur = data.current_weather;
     const daily = data.daily;
+    const hourly = data.hourly;
 
-    if (!cur || !daily) {
-      throw new Error('Open-Meteo response missing current_weather or daily');
-    }
+    if (!cur || !daily) throw new Error('Open-Meteo response missing current_weather or daily');
 
     const highToday = Math.round(daily.temperature_2m_max[0]);
     const lowToday = Math.round(daily.temperature_2m_min[0]);
 
     const currentTemp = Math.round(cur.temperature);
-    const currentCode = Number(cur.weathercode);
+    let currentCode = Number(cur.weathercode);
     const isDay = cur.is_day === 1;
+
+    // Apply “recent snow wins” to the CURRENT icon code
+    currentCode = applyRecentSnowOverride(cfg, currentCode, isDay, hourly, cur.time);
 
     const currentThundersnow = isThundersnow(cfg, currentCode, currentTemp, tempUnit);
 
-    // OPTIONAL: prevent visually-odd “current > high” by clamping high/low to include current
+    // Clamp daily high/low so current isn’t visually above “high”
     const fixedHigh = Math.max(highToday, currentTemp);
     const fixedLow = Math.min(lowToday, currentTemp);
 
     const forecast = [];
-    for (let i = 1; i <= 4; i++) {
+    for (let i = 1; i <= 5; i++) {
       const max = Math.round(daily.temperature_2m_max[i]);
       const min = Math.round(daily.temperature_2m_min[i]);
-      const mid = max; // show daily high
-      const code = Number(daily.weathercode[i]);
+      const mid = Math.round((max + min) / 2);
 
-      // For daily forecast icons, use day-style icons (is_day=true).
-      // Thundersnow for forecast: infer using the *mid* temp (you could choose min instead).
+      const code = Number(daily.weathercode[i]);
       const thundersnow = isThundersnow(cfg, code, mid, tempUnit);
 
       forecast.push({
