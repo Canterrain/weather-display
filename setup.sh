@@ -157,6 +157,8 @@ cat <<EOF > ~/weather-display/config.json
   "timeFormat": "$timeFormat",
   "thundersnowF": 34,
   "thundersnowC": 1
+  "recentSnowHours": 2,
+  "recentSnowMm": 0
 }
 EOF
 
