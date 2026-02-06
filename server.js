@@ -129,7 +129,6 @@ function applyRecentSnowOverride(cfg, currentCode, isDay, hourly, nowIso) {
   }
   if (bestI < 0) return currentCode;
 
-  const windowCount = Math.max(0, Math.min(times.length, recentHours + 1)); // include current hour + N previous
   const startI = Math.max(0, bestI - recentHours);
 
   let sawSnow = false;
@@ -147,7 +146,6 @@ function applyRecentSnowOverride(cfg, currentCode, isDay, hourly, nowIso) {
 
   if (!sawSnow && !sawSnowCode) return currentCode;
 
-  // If we saw snow recently, choose a reasonable snow code for the icon mapping.
   // 73 = moderate snow fall (works with your mapping -> snow)
   return 73;
 }
@@ -170,7 +168,7 @@ app.get('/weather', async (req, res) => {
       `&daily=temperature_2m_max,temperature_2m_min,weathercode` +
       `&temperature_unit=${encodeURIComponent(tempUnit)}` +
       `&timezone=${encodeURIComponent(cfg.timezone || 'auto')}` +
-      `&forecast_days=5`;
+      `&forecast_days=7`;
 
     const resp = await fetchWithTimeout(url, 10000);
     const data = await resp.json();
@@ -206,21 +204,21 @@ app.get('/weather', async (req, res) => {
     const fixedLow = Math.min(lowToday, currentTemp);
 
     const forecast = [];
-    for (let i = 1; i <= 5; i++) {
-      const max = Math.round(daily.temperature_2m_max[i]);
-      const min = Math.round(daily.temperature_2m_min[i]);
-      const mid = Math.round((max + min) / 2);
+    // We want "tomorrow + next 5" => 6 days total (Sat -> Thu, etc.)
+    // daily arrays include "today" at [0], so we start at 1.
+    for (let i = 1; i <= 6; i++) {
+      const maxRaw = daily.temperature_2m_max[i];
+      const minRaw = daily.temperature_2m_min[i];
+      const codeRaw = daily.weathercode[i];
 
-      const code = Number(daily.weathercode[i]);
-
-      // Bail out cleanly if Open-Meteo didn’t give us this day
+      // Skip days Open-Meteo didn't return (prevents nulls)
       if (maxRaw == null || minRaw == null || codeRaw == null) continue;
-      
+
       const max = Math.round(maxRaw);
       const min = Math.round(minRaw);
       const mid = Math.round((max + min) / 2);
       const code = Number(codeRaw);
-      
+
       const thundersnow = isThundersnow(cfg, code, mid, tempUnit);
 
       forecast.push({
