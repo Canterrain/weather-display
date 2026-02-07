@@ -26,3 +26,9 @@ config*.json
 public/assets/background.jpg
 public/assets/background.png
 public/assets/background.webp
+public/assets/background-day.jpg
+public/assets/background-day.png
+public/assets/background-day.webp
+public/assets/background-night.jpg
+public/assets/background-night.png
+public/assets/background-night.webp
