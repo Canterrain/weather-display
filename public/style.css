@@ -2,6 +2,13 @@ html {
   cursor: none;
 }
 
+/* Unified text palette */
+:root {
+  --text-primary: #ffffff;
+  --text-secondary: #d9d9d6;
+  --text-muted: #cccccc;
+}
+
 body {
   position: relative;
   margin: 0;
@@ -10,7 +17,7 @@ body {
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
-  color: white;
+  color: var(--text-primary);
   font-family: 'Lucida Console', 'Lucida Sans Typewriter', 'Monaco', 'Courier New', 'monospace';
   overflow: hidden;
 }
@@ -27,7 +34,7 @@ body::before {
 
 /* Background mode classes (background images are applied by JS) */
 body.day-background {
-  color: #fff;
+  color: var(--text-primary);
 }
 
 /* Day: gentle darkening + vignette for readability on light backgrounds */
@@ -41,7 +48,7 @@ body.night-background {
   background-color: black;
   background-size: cover;
   background-position: center;
-  color: #D9D9D6;
+  color: var(--text-secondary);
 }
 
 /* Night: no scrim needed (kept transparent) */
@@ -72,6 +79,7 @@ body.night-background::before {
   margin-left: 60px;
 }
 
+/* Main time should always be the same crisp white */
 #time {
   display: flex;
   font-size: 210px;
@@ -79,6 +87,7 @@ body.night-background::before {
   line-height: 190px;
   margin-bottom: 0;
   align-items: center;
+  color: var(--text-primary);
 }
 
 .flip-clock__piece {
@@ -103,12 +112,13 @@ body.night-background::before {
   transform: rotateX(360deg);
 }
 
+/* Colon should match time color exactly */
 .flip-clock__colon {
   font-size: 210px;
   font-weight: 400;
   line-height: 190px;
   margin: 0 0px;
-  color: white;
+  color: var(--text-primary);
 }
 
 .flip-clock__spacer {
@@ -118,10 +128,11 @@ body.night-background::before {
   margin: 0 0px;
 }
 
+/* Day/date line should match time color (prevents off-white drift) */
 #day {
   font-size: 110px;
   font-weight: 400;
-  color: white;
+  color: var(--text-primary);
   margin-top: 10px;
   white-space: nowrap;
 }
@@ -174,6 +185,7 @@ body.night-background::before {
   margin-right: 50px;
 }
 
+/* Current temp should stay primary white */
 #current-temp {
   font-size: 170px;
   font-weight: 400;
@@ -181,6 +193,7 @@ body.night-background::before {
   padding: 0;
   line-height: 1;
   align-self: flex-start;
+  color: var(--text-primary);
 }
 
 #high-low {
@@ -198,17 +211,18 @@ body.night-background::before {
   gap: 6px;
 }
 
+/* Hi/Lo labels and values stay "secondary" so they don't compete */
 .hl-label {
   font-size: 70px;
   font-weight: 400;
-  color: #ccc;
+  color: var(--text-muted);
   line-height: 1;
 }
 
 #high, #low {
   font-size: 75px;
   font-weight: 400;
-  color: #ccc;
+  color: var(--text-muted);
 }
 
 /* Forecast Section */
@@ -221,6 +235,7 @@ body.night-background::before {
   margin-bottom: 30px;
 }
 
+/* Forecast text should be consistent (inherits body, but set explicitly for stability) */
 .forecast-day {
   display: flex;
   flex-direction: column;
@@ -230,6 +245,7 @@ body.night-background::before {
   padding-top: 0px;
   text-align: center;
   font-size: 35px;
+  color: var(--text-secondary);
 }
 
 .forecast-day img {
@@ -274,7 +290,7 @@ body.night-background::before {
   height: 50%;
   overflow: hidden;
   background: black;
-  color: white;
+  color: var(--text-primary);
   font-size: 120px;
   line-height: 140px;
   display: flex;
@@ -327,6 +343,7 @@ body.night-background::before {
 .colon, .ampm {
   font-size: 100px;
   padding: 0 10px;
-  color: white;
+  color: var(--text-primary);
   line-height: 140px;
 }
+
