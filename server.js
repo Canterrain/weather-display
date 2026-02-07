@@ -33,7 +33,7 @@ async function fetchWithTimeout(url, ms = 10000) {
   }
 }
 
-// --- Open-Meteo geocoding: "City,ST,CC" -> {lat, lon, timezone} ---
+// --- Open-Meteo geocoding: location -> {lat, lon, timezone} ---
 async function geocodeLocation(location) {
   const url =
     `https://geocoding-api.open-meteo.com/v1/search` +
@@ -84,8 +84,7 @@ function temperatureUnitFromCfg(cfg) {
   return cfg.units === 'metric' ? 'celsius' : 'fahrenheit';
 }
 
-// If Open-Meteo says thunderstorm (95/96/99) AND it's cold enough,
-// show thundersnow icon. Threshold configurable via config.thundersnowF / thundersnowC.
+// If Open-Meteo says thunderstorm (95/96/99) AND it's cold enough, show thundersnow icon.
 function isThundersnow(cfg, weathercode, tempNow, tempUnit) {
   const thunderCodes = [95, 96, 99];
   if (!thunderCodes.includes(weathercode)) return false;
@@ -99,9 +98,9 @@ function isThundersnow(cfg, weathercode, tempNow, tempUnit) {
 
 // Recent snow override:
 // If snowfall > 0 in the last N hours, force current weathercode to "snow" family
-function applyRecentSnowOverride(cfg, currentCode, isDay, hourly, nowIso) {
+function applyRecentSnowOverride(cfg, currentCode, hourly, nowIso) {
   const recentHours = typeof cfg.recentSnowHours === 'number' ? cfg.recentSnowHours : 2;
-  const snowThreshold = typeof cfg.recentSnowMm === 'number' ? cfg.recentSnowMm : 0; // treat any >0 as snow by default
+  const snowThreshold = typeof cfg.recentSnowMm === 'number' ? cfg.recentSnowMm : 0;
 
   const times = hourly?.time;
   const snowfall = hourly?.snowfall;
@@ -111,7 +110,6 @@ function applyRecentSnowOverride(cfg, currentCode, isDay, hourly, nowIso) {
     return currentCode;
   }
 
-  // Find nearest hourly index to nowIso (current_weather.time is often :45, hourly is :00)
   const parse = (s) => new Date(s).getTime();
   const nowT = parse(nowIso);
   if (!Number.isFinite(nowT)) return currentCode;
@@ -150,6 +148,12 @@ function applyRecentSnowOverride(cfg, currentCode, isDay, hourly, nowIso) {
   return 73;
 }
 
+function safeDailyValue(arr, i) {
+  if (!Array.isArray(arr)) return null;
+  if (i < 0 || i >= arr.length) return null;
+  return arr[i];
+}
+
 app.get('/weather', async (req, res) => {
   config = loadConfig();
   if (!config) return res.status(500).json({ error: 'Missing config.json' });
@@ -158,17 +162,21 @@ app.get('/weather', async (req, res) => {
     const cfg = await ensureLatLonTimezone(config);
     const tempUnit = temperatureUnitFromCfg(cfg);
 
-    // Pull daily + current + hourly so we can do “recent snow” override for current icon
+    // We want: today + next 5 days available so we can build 5 forecast entries (tomorrow..+5)
+    // => need at least 6 days total in the daily arrays (index 0..5)
+    const forecastDays = 6;
+
+    // Include sunrise/sunset so the frontend can do true day/night backgrounds.
     const url =
       `https://api.open-meteo.com/v1/forecast` +
       `?latitude=${encodeURIComponent(cfg.lat)}` +
       `&longitude=${encodeURIComponent(cfg.lon)}` +
       `&current_weather=true` +
       `&hourly=weathercode,snowfall` +
-      `&daily=temperature_2m_max,temperature_2m_min,weathercode` +
+      `&daily=sunrise,sunset,temperature_2m_max,temperature_2m_min,weathercode` +
       `&temperature_unit=${encodeURIComponent(tempUnit)}` +
       `&timezone=${encodeURIComponent(cfg.timezone || 'auto')}` +
-      `&forecast_days=7`;
+      `&forecast_days=${forecastDays}`;
 
     const resp = await fetchWithTimeout(url, 10000);
     const data = await resp.json();
@@ -187,31 +195,36 @@ app.get('/weather', async (req, res) => {
 
     if (!cur || !daily) throw new Error('Open-Meteo response missing current_weather or daily');
 
-    const highToday = Math.round(daily.temperature_2m_max[0]);
-    const lowToday = Math.round(daily.temperature_2m_min[0]);
+    const highTodayRaw = safeDailyValue(daily.temperature_2m_max, 0);
+    const lowTodayRaw = safeDailyValue(daily.temperature_2m_min, 0);
+
+    const highToday = highTodayRaw == null ? null : Math.round(highTodayRaw);
+    const lowToday = lowTodayRaw == null ? null : Math.round(lowTodayRaw);
 
     const currentTemp = Math.round(cur.temperature);
     let currentCode = Number(cur.weathercode);
     const isDay = cur.is_day === 1;
 
     // Apply “recent snow wins” to the CURRENT icon code
-    currentCode = applyRecentSnowOverride(cfg, currentCode, isDay, hourly, cur.time);
+    currentCode = applyRecentSnowOverride(cfg, currentCode, hourly, cur.time);
 
     const currentThundersnow = isThundersnow(cfg, currentCode, currentTemp, tempUnit);
 
-    // Clamp daily high/low so current isn’t visually above “high”
-    const fixedHigh = Math.max(highToday, currentTemp);
-    const fixedLow = Math.min(lowToday, currentTemp);
+    // Clamp hi/lo so current isn’t visually above “high”
+    const fixedHigh = highToday == null ? currentTemp : Math.max(highToday, currentTemp);
+    const fixedLow = lowToday == null ? currentTemp : Math.min(lowToday, currentTemp);
+
+    // Today sunrise/sunset (ISO strings from Open-Meteo in the requested timezone)
+    const sunriseToday = safeDailyValue(daily.sunrise, 0) || null;
+    const sunsetToday = safeDailyValue(daily.sunset, 0) || null;
 
     const forecast = [];
-    // We want "tomorrow + next 5" => 6 days total (Sat -> Thu, etc.)
-    // daily arrays include "today" at [0], so we start at 1.
+    // Build exactly 5 forecast entries: tomorrow (1) through +5 (5)
     for (let i = 1; i <= 5; i++) {
-      const maxRaw = daily.temperature_2m_max[i];
-      const minRaw = daily.temperature_2m_min[i];
-      const codeRaw = daily.weathercode[i];
+      const maxRaw = safeDailyValue(daily.temperature_2m_max, i);
+      const minRaw = safeDailyValue(daily.temperature_2m_min, i);
+      const codeRaw = safeDailyValue(daily.weathercode, i);
 
-      // Skip days Open-Meteo didn't return (prevents nulls)
       if (maxRaw == null || minRaw == null || codeRaw == null) continue;
 
       const max = Math.round(maxRaw);
@@ -238,7 +251,11 @@ app.get('/weather', async (req, res) => {
         low: fixedLow,
         code: currentCode,
         is_day: isDay,
-        thundersnow: currentThundersnow
+        thundersnow: currentThundersnow,
+
+        // Additive fields (non-breaking):
+        sunrise: sunriseToday,
+        sunset: sunsetToday
       },
       forecast
     };
