@@ -1,17 +1,15 @@
 # Clock Weather Display
 
-A fullscreen clock and weather dashboard designed for Raspberry Pi with HDMI displays like the Wisecoco 8.8" IPS panel. The UI pulls real-time weather data from OpenWeatherMap and works great mounted under cabinets or as a minimalist desk display.
-
-
+A fullscreen clock and weather dashboard designed for Raspberry Pi with HDMI displays like the Wisecoco 8.8" IPS panel. The UI pulls real-time weather data from Open-Meteo and works great mounted under cabinets or as a minimalist desk display.
 
 ## ✨ Features
 
 - Digital clock with configurable 12h or 24h format
 - Day/date display
-- Real-time weather via OpenWeatherMap API
+- Real-time weather via Open-Meteo (no API key required)
 - Custom SVG weather icons
 - Auto screen rotation to landscape
-- Optional background image (automatically detected)
+- Optional background images with day/night support
 - Auto-start with PM2 on boot
 - Clean, modern layout designed for 1920×480 displays
 
@@ -20,7 +18,6 @@ A fullscreen clock and weather dashboard designed for Raspberry Pi with HDMI dis
 - Raspberry Pi 4 or Pi Zero 2 W
 - HDMI display (e.g., Wisecoco 8.8" 1920×480 IPS screen)
 - Raspberry Pi OS (Bookworm recommended)
-- OpenWeatherMap API key
 
 ## 🚀 Quick Start
 
@@ -39,33 +36,38 @@ chmod +x setup.sh
 
 The setup script will:
 
-- Prompt for your OpenWeatherMap API key and city
 - Install all required system and Node.js dependencies
 - Set up screen rotation for landscape-oriented displays
 - Configure PM2 to auto-launch the app at boot
 
-💡 After setup finishes, reboot your Pi to apply all changes.
+💡 After setup finishes, everything should work automatically without reboot.
 
----
-
-## 🔑 Getting an OpenWeatherMap API Key
-
-1. Visit [https://openweathermap.org/api](https://openweathermap.org/api)
-2. Sign up for a free account
-3. Go to your [API Keys dashboard](https://home.openweathermap.org/api_keys)
-4. Copy your key and paste it into the `setup.sh` prompt
 
 ---
 
 ## 🖼️ Custom Backgrounds
 
-You can display a background image instead of a black background by placing one of the following files in the `public/assets/` directory:
+You can display background images by placing files in the `public/assets/` directory.
+
+### Generic (day-only)
+If only a generic background is present, it will be shown during the day and hidden at night:
 
 - `background.jpg`
 - `background.webp`
 - `background.png`
 
-✅ The first valid file found in that order will be used. Recommended resolution: **1920×480**
+### Day / Night backgrounds
+You can also provide separate backgrounds for day and night:
+
+- `background-day.jpg`
+- `background-day.webp`
+- `background-day.png`
+- `background-night.jpg`
+- `background-night.webp`
+- `background-night.png`
+
+✅ The first valid file found in each category will be used.  
+Recommended resolution: **1920×480**
 
 ---
 
@@ -87,28 +89,34 @@ To use your own custom icons:
 
 ## 🧠 Project Structure
 
-| Path                        | Description                           |
-|-----------------------------|---------------------------------------|
-| `public/index.html`         | Main UI layout                        |
-| `public/style.css`          | Display styles                        |
-| `public/renderer/clock.js`  | Time and date logic                   |
-| `public/renderer/weather.js`| Weather data fetch & rendering       |
-| `server.js`                 | Express server for frontend           |
-| `scripts/rwc.sh`            | Electron kiosk launch script          |
-| `config.json`               | Created by `setup.sh` for API config  |
+| Path                        | Description                                  |
+|-----------------------------|----------------------------------------------|
+| `public/index.html`         | Main UI layout                               |
+| `public/style.css`          | Display styles                               |
+| `public/renderer/clock.js`  | Time and date logic                          |
+| `public/renderer/weather.js`| Weather data fetch & rendering               |
+| `server.js`                 | Express server for frontend                  |
+| `scripts/rwc.sh`            | PM2 launch script                            |
+| `config.json`               | Created by `setup.sh` for user configuration |
+
+
 
 ---
 
 ## 🛠️ Development Notes
 
-To launch manually during development:
+This project runs as a Node.js server (Express) and is typically launched via PM2 on a Raspberry Pi.
 
-```
-npm install
-npm start
-```
+For development and testing, you can access the UI directly in a browser:
 
-This opens the Electron app in a resizable window.
+http://<pi-ip>:3000/
+
+The following developer-only query parameters are available for testing:
+
+- `?force=day` / `?force=night`  
+  Forces day or night mode without waiting for real sunrise/sunset.
+
+These testing features are opt-in and do not affect normal operation.
 
 ---
 
@@ -138,4 +146,4 @@ Shout out to the [Magic Mirror](https://github.com/MagicMirrorOrg/MagicMirror) t
 
 ---
 
-Made  by [Josh Hendrickson](https://anoraker.com)
+Made by [Josh Hendrickson](https://anoraker.com)
