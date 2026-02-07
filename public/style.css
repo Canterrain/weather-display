@@ -12,25 +12,47 @@ body {
   background-repeat: no-repeat;
   color: white;
   font-family: 'Lucida Console', 'Lucida Sans Typewriter', 'Monaco', 'Courier New', 'monospace';
-  	overflow: hidden;
-
+  overflow: hidden;
 }
-/* background image CSS*/
+
+/* Contrast scrim layer so white UI stays readable on bright backgrounds */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: transparent;
+}
+
+/* Background mode classes (background images are applied by JS) */
 body.day-background {
-  	background-image: url('assets/background.jpg'), url('assets/background.png'), url('assets/background.webp');
-  	background-size: cover;
-  	background-position: center;
-  	color: #fff;
+  color: #fff;
+}
+
+/* Day: gentle darkening + vignette for readability on light backgrounds */
+body.day-background::before {
+  background:
+    radial-gradient(ellipse at center, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.35) 85%),
+    linear-gradient(rgba(0,0,0,0.22), rgba(0,0,0,0.22));
 }
 
 body.night-background {
-  	background-color: black;
-  	background-size: cover;
-  	background-position: center;
-  	color: #D9D9D6;
+  background-color: black;
+  background-size: cover;
+  background-position: center;
+  color: #D9D9D6;
 }
 
+/* Night: no scrim needed (kept transparent) */
+body.night-background::before {
+  background: transparent;
+}
+
+/* Ensure UI renders above scrim */
 .container {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: row;
   justify-content: flex-start;
@@ -99,7 +121,7 @@ body.night-background {
 #day {
   font-size: 110px;
   font-weight: 400;
-  color: #white;
+  color: white;
   margin-top: 10px;
   white-space: nowrap;
 }
@@ -113,10 +135,8 @@ body.night-background {
 }
 
 .date-number {
-  margin-left: 30px; 
+  margin-left: 30px;
 }
-
-
 
 /* Weather Section */
 .weather-section {
@@ -125,7 +145,7 @@ body.night-background {
   align-items: flex-end;
   justify-content: flex-start;
   margin-top: 30px;
-  margin-left: auto;  
+  margin-left: auto;
   margin-right: 50px;
 }
 
@@ -149,9 +169,9 @@ body.night-background {
   flex-direction: row;
   align-items: flex-end;
   gap: 10px;
-	margin-top: 30px;
+  margin-top: 30px;
   margin-bottom: 0px;
-	margin-right: 50px;
+  margin-right: 50px;
 }
 
 #current-temp {
@@ -310,4 +330,3 @@ body.night-background {
   color: white;
   line-height: 140px;
 }
-
