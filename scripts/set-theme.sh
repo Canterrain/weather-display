@@ -2,37 +2,113 @@
 set -euo pipefail
 
 THEME="${1:-}"
-BASE="$HOME/weather-display/public/assets"
+ROOT="$HOME/weather-display"
+BASE="$ROOT/public/assets"
 THEMES="$BASE/icon-themes"
+ICONS_DIR="$BASE/icons"
+ICONS_BASE="$BASE/icons.base"
 
-if [[ -z "$THEME" ]]; then
+usage() {
   echo "Usage: set-theme.sh <theme>"
   echo
-  echo "Available themes:"
-  ls "$THEMES"
-  exit 1
-fi
-
-if [[ ! -d "$THEMES/$THEME" ]]; then
-  echo "Theme '$THEME' not found."
+  echo "Special theme: normal (restore default icons and clear backgrounds)"
   echo
-  echo "Available themes:"
-  ls "$THEMES"
+  echo "If themes are installed, available themes are:"
+  if [[ -d "$THEMES" ]]; then
+    ls "$THEMES"
+  else
+    echo "(no $THEMES folder yet)"
+  fi
+}
+
+err() { echo "ERROR: $*" >&2; }
+
+copy_icons() {
+  local src="$1"
+
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a --delete \
+      --exclude="background-day.jpg" \
+      --exclude="background-night.jpg" \
+      --exclude="*.DS_Store" \
+      "$src/" "$ICONS_DIR/"
+  else
+    # crude fallback: delete svg files then copy
+    find "$ICONS_DIR" -maxdepth 1 -type f -name "*.svg" -delete
+    cp -f "$src"/*.svg "$ICONS_DIR/" 2>/dev/null || true
+  fi
+}
+
+ensure_not_symlink_dir() {
+  local p="$1"
+  if [[ -L "$p" ]]; then
+    err "$p is a symlink. This project expects a real directory there."
+    echo "Fix with:"
+    echo "  rm -f \"$p\" && mkdir -p \"$p\" && git checkout -- public/assets/icons"
+    exit 1
+  fi
+  mkdir -p "$p"
+}
+
+make_default_backup_if_missing() {
+  # Create a backup of default icons the first time we run (if missing)
+  if [[ -d "$ICONS_BASE" ]]; then
+    return 0
+  fi
+
+  mkdir -p "$ICONS_BASE"
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a --exclude="*.DS_Store" "$ICONS_DIR/" "$ICONS_BASE/"
+  else
+    cp -a "$ICONS_DIR/." "$ICONS_BASE/" 2>/dev/null || true
+    rm -f "$ICONS_BASE/.DS_Store" 2>/dev/null || true
+  fi
+}
+
+# ---- Entry ----
+if [[ -z "$THEME" ]]; then
+  usage
   exit 1
 fi
 
-if [[ ! -d "$THEMES/$THEME/icons" ]]; then
-  echo "Theme '$THEME' is missing an icons/ folder."
-  exit 1
-fi
+# Ensure icons directory exists (and is NOT a symlink)
+ensure_not_symlink_dir "$ICONS_DIR"
+
+# Ensure we have a "known-good" baseline to restore to
+make_default_backup_if_missing
 
 echo "Switching to theme: $THEME"
 
-# Switch icons (symlink)
-rm -f "$BASE/icons"
-ln -s "icon-themes/$THEME/icons" "$BASE/icons"
+if [[ "$THEME" == "normal" ]]; then
+  if [[ ! -d "$ICONS_BASE" ]]; then
+    err "Missing $ICONS_BASE so I can't restore defaults."
+    exit 1
+  fi
 
-# Switch backgrounds (copy/overwrite)
+  # Restore default icons
+  copy_icons "$ICONS_BASE"
+
+  # Clear any themed backgrounds so the display truly returns to baseline
+  rm -f "$BASE/background-day.jpg" "$BASE/background-night.jpg"
+
+  echo "Normal theme restored: icons reset and backgrounds cleared."
+  echo "Theme '$THEME' active."
+  exit 0
+fi
+
+# Theme mode
+if [[ ! -d "$THEMES/$THEME/icons" ]]; then
+  err "Theme '$THEME' not found or missing icons folder: $THEMES/$THEME/icons"
+  echo
+  echo "Available themes:"
+  if [[ -d "$THEMES" ]]; then ls "$THEMES"; else echo "(no $THEMES folder)"; fi
+  exit 1
+fi
+
+# Apply themed icons
+copy_icons "$THEMES/$THEME/icons"
+
+# Apply themed backgrounds (copy/overwrite if present)
 DAY_BG="$THEMES/$THEME/icons/background-day.jpg"
 NIGHT_BG="$THEMES/$THEME/icons/background-night.jpg"
 
