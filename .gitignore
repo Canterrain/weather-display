@@ -32,3 +32,7 @@ public/assets/background-day.webp
 public/assets/background-night.jpg
 public/assets/background-night.png
 public/assets/background-night.webp
+
+# Optional icon themes and local backups
+public/assets/icon-themes/
+public/assets/icons.base/
