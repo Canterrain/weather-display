@@ -1,5 +1,7 @@
 # Clock Weather Display
 
+![Clock Weather Display](https://github.com/user-attachments/assets/b909da12-5851-4d60-9017-aa0ce8f040c7)
+
 A fullscreen clock and weather dashboard designed for Raspberry Pi with HDMI displays like the Wisecoco 8.8" IPS panel. The UI pulls real-time weather data from Open-Meteo and works great mounted under cabinets or as a minimalist desk display.
 
 ## ✨ Features
