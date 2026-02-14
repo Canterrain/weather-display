@@ -17,9 +17,14 @@ A fullscreen clock and weather dashboard designed for Raspberry Pi with HDMI dis
 
 ## 🖥 Requirements
 
-- Raspberry Pi 4 or Pi Zero 2 W
-- HDMI display (e.g., Wisecoco 8.8" 1920×480 IPS screen)
+- [Raspberry Pi 4](https://amzn.to/40en56s)
+- or
+- [Raspberry Pi 5](https://amzn.to/3ZEJUQH) (affiliate)
+- [Rasperry Pi Power Supply](https://amzn.to/3MvrPBF) (affiliate)
+- [Wisecoco HDMI display](https://amzn.to/4cuofSN) (affiliate)
+- [Micro HDMI to HDMI adapter](https://amzn.to/3ZyFOJZ) (affiliate)
 - Raspberry Pi OS (Bookworm recommended)
+- 
 
 ## 🚀 Quick Start
 
