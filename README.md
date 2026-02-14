@@ -24,7 +24,6 @@ A fullscreen clock and weather dashboard designed for Raspberry Pi with HDMI dis
 - [Wisecoco HDMI display](https://amzn.to/4cuofSN) (affiliate)
 - [Micro HDMI to HDMI adapter](https://amzn.to/3ZyFOJZ) (affiliate)
 - Raspberry Pi OS (Bookworm recommended)
-- 
 
 ## 🚀 Quick Start
 
