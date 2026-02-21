@@ -1,12 +1,32 @@
+/* public/style.css */
+
 html {
   cursor: none;
 }
 
-/* Unified text palette */
+/* Unified palette + dimmer controls */
 :root {
   --text-primary: #ffffff;
   --text-secondary: #d9d9d6;
   --text-muted: #cccccc;
+
+  /* Background readability (scrim) */
+  --day-dim: 0.22;
+  --day-vignette: 0.35;
+
+  /* Night background scrim (optional) */
+  --night-bg-dim: 0.10;
+  --night-bg-vignette: 0.35;
+
+  /*
+    REAL NIGHT DIMMER (dims text + icons + everything in .container)
+    1.00 = no dim
+    0.80 = slightly dim
+    0.70 = clearly dimmer
+    0.60 = very dim
+    0.50 = bedtime dim
+  */
+  --night-ui-dim: 0.55;
 }
 
 body {
@@ -18,11 +38,11 @@ body {
   background-position: center center;
   background-repeat: no-repeat;
   color: var(--text-primary);
-  font-family: 'Lucida Console', 'Lucida Sans Typewriter', 'Monaco', 'Courier New', 'monospace';
+  font-family: 'Lucida Console', 'Lucida Sans Typewriter', 'Monaco', 'Courier New', monospace;
   overflow: hidden;
 }
 
-/* Contrast scrim layer so white UI stays readable on bright backgrounds */
+/* Scrim layer (darkens only the BACKGROUND, not the UI) */
 body::before {
   content: "";
   position: fixed;
@@ -32,16 +52,23 @@ body::before {
   background: transparent;
 }
 
-/* Background mode classes (background images are applied by JS) */
+/* Mode classes set by background-switcher.js */
 body.day-background {
   color: var(--text-primary);
 }
 
-/* Day: gentle darkening + vignette for readability on light backgrounds */
+/* Day: gentle darkening + vignette for readability on light / busy backgrounds */
 body.day-background::before {
   background:
-    radial-gradient(ellipse at center, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.35) 85%),
-    linear-gradient(rgba(0,0,0,0.22), rgba(0,0,0,0.22));
+    radial-gradient(
+      ellipse at center,
+      rgba(0,0,0,0.08) 0%,
+      rgba(0,0,0,var(--day-vignette)) 85%
+    ),
+    linear-gradient(
+      rgba(0,0,0,var(--day-dim)),
+      rgba(0,0,0,var(--day-dim))
+    );
 }
 
 body.night-background {
@@ -51,9 +78,29 @@ body.night-background {
   color: var(--text-secondary);
 }
 
-/* Night: no scrim needed (kept transparent) */
+/* Night: optional mild scrim (mostly for backgrounds, not required for dimming UI) */
 body.night-background::before {
-  background: transparent;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(0,0,0,0.10) 0%,
+      rgba(0,0,0,var(--night-bg-vignette)) 85%
+    ),
+    linear-gradient(
+      rgba(0,0,0,var(--night-bg-dim)),
+      rgba(0,0,0,var(--night-bg-dim))
+    );
+}
+
+/*
+  IMPORTANT:
+  This is the REAL dimmer. It dims the UI pixels (time, temps, icons) at night.
+  Your background script already adds: night-background and is-night.
+  We’ll dim on either, so it works regardless.
+*/
+body.night-background .container,
+body.is-night .container {
+  filter: brightness(var(--night-ui-dim));
 }
 
 /* Ensure UI renders above scrim */
@@ -79,7 +126,7 @@ body.night-background::before {
   margin-left: 60px;
 }
 
-/* Main time should always be the same crisp white */
+/* Time */
 #time {
   display: flex;
   font-size: 210px;
@@ -112,7 +159,6 @@ body.night-background::before {
   transform: rotateX(360deg);
 }
 
-/* Colon should match time color exactly */
 .flip-clock__colon {
   font-size: 210px;
   font-weight: 400;
@@ -128,7 +174,6 @@ body.night-background::before {
   margin: 0 0px;
 }
 
-/* Day/date line should match time color (prevents off-white drift) */
 #day {
   font-size: 110px;
   font-weight: 400;
@@ -137,17 +182,9 @@ body.night-background::before {
   white-space: nowrap;
 }
 
-.day-name {
-  margin-right: 0px;
-}
-
-.month-name {
-  margin-left: 30px;
-}
-
-.date-number {
-  margin-left: 30px;
-}
+.day-name { margin-right: 0px; }
+.month-name { margin-left: 30px; }
+.date-number { margin-left: 30px; }
 
 /* Weather Section */
 .weather-section {
@@ -185,7 +222,6 @@ body.night-background::before {
   margin-right: 50px;
 }
 
-/* Current temp should stay primary white */
 #current-temp {
   font-size: 170px;
   font-weight: 400;
@@ -211,7 +247,6 @@ body.night-background::before {
   gap: 6px;
 }
 
-/* Hi/Lo labels and values stay "secondary" so they don't compete */
 .hl-label {
   font-size: 70px;
   font-weight: 400;
@@ -225,7 +260,7 @@ body.night-background::before {
   color: var(--text-muted);
 }
 
-/* Forecast Section */
+/* Forecast */
 .forecast {
   display: flex;
   justify-content: flex-end;
@@ -235,7 +270,6 @@ body.night-background::before {
   margin-bottom: 30px;
 }
 
-/* Forecast text should be consistent (inherits body, but set explicitly for stability) */
 .forecast-day {
   display: flex;
   flex-direction: column;
@@ -269,7 +303,7 @@ body.night-background::before {
   display: none;
 }
 
-/* Flip Clock Layout */
+/* Legacy flip clock layout kept (unused) */
 .flip-clock {
   display: flex;
   align-items: center;
@@ -346,4 +380,3 @@ body.night-background::before {
   color: var(--text-primary);
   line-height: 140px;
 }
-

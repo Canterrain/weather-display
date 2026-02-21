@@ -1,7 +1,10 @@
-// public/background-switch.js
+// public/background-switcher.js
 (() => {
   const DAY_CLASS = 'day-background';
   const NIGHT_CLASS = 'night-background';
+
+  // NEW: class to drive night-only UI dimming
+  const NIGHT_UI_CLASS = 'is-night';
 
   const CHECK_INTERVAL_MS = 15 * 60 * 1000;
 
@@ -32,8 +35,13 @@
 
   function setMode(isDay) {
     const body = document.body;
+
+    // Existing background-mode classes
     body.classList.remove(DAY_CLASS, NIGHT_CLASS);
     body.classList.add(isDay ? DAY_CLASS : NIGHT_CLASS);
+
+    // NEW: night-only UI class (for dimming/softening whites via CSS)
+    body.classList.toggle(NIGHT_UI_CLASS, !isDay);
   }
 
   function setBackgroundImage(urlOrNull) {
