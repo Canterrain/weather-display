@@ -1,17 +1,20 @@
 {
   "name": "weather-display",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Under-cabinet weather and time display",
   "main": "main.js",
+  "private": true,
   "scripts": {
     "start": "electron ."
   },
+  "engines": {
+    "node": ">=18 <19",
+    "npm": ">=9"
+  },
   "dependencies": {
     "abort-controller": "^3.0.0",
+    "electron": "^28.3.3",
     "express": "^4.22.1",
     "node-fetch": "^2.7.0"
-  },
-  "devDependencies": {
-    "electron": "^28.3.3"
   }
 }
