@@ -1,16 +1,38 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 echo "-------------------------------"
 echo "Clock Weather Display Setup"
 echo "-------------------------------"
 
-# 1. Prompt for config 
-read -p "Enter your city (e.g., Cincinnati,OH,US): " city
-read -p "Choose time format (12 or 24): " timeFormat
-read -p "Choose temperature units (imperial or metric): " units
+# ---------------------------------------------------------------------------
+# Guardrails
+# ---------------------------------------------------------------------------
 
-# 2. Validate inputs
+# Do not run the whole script as root (breaks npm/pm2 paths and installs into /root)
+if [[ "${EUID}" -eq 0 ]]; then
+  echo "ERROR: Do not run this script with sudo."
+  echo "Run: bash setup.sh"
+  exit 1
+fi
+
+ARCH="$(uname -m)"
+if [[ "$ARCH" == "armv7l" ]]; then
+  echo "WARNING: 32-bit Raspberry Pi OS detected (armv7l)."
+  echo "Electron installs can fail on 32-bit. Strongly recommend 64-bit Raspberry Pi OS (aarch64)."
+  echo "Continuing anyway..."
+fi
+
+# ---------------------------------------------------------------------------
+# 1) Prompt for config
+# ---------------------------------------------------------------------------
+read -r -p "Enter your city (e.g., Cincinnati,OH,US): " city
+read -r -p "Choose time format (12 or 24): " timeFormat
+read -r -p "Choose temperature units (imperial or metric): " units
+
+# ---------------------------------------------------------------------------
+# 2) Validate inputs
+# ---------------------------------------------------------------------------
 if [[ "$timeFormat" != "12" && "$timeFormat" != "24" ]]; then
   timeFormat="12"
 fi
@@ -19,33 +41,88 @@ if [[ "$units" != "imperial" && "$units" != "metric" ]]; then
   units="imperial"
 fi
 
-# 3. Ensure fresh copy of weather-display
-echo "Cloning latest version of weather-display from GitHub..."
-rm -rf ~/weather-display
-git clone https://github.com/Canterrain/weather-display.git ~/weather-display
+# ---------------------------------------------------------------------------
+# 3) Install system dependencies (base)
+# ---------------------------------------------------------------------------
+echo "Installing system packages..."
+sudo apt-get update
+sudo apt-get install -y \
+  git \
+  python3 \
+  python3-venv \
+  curl \
+  ca-certificates \
+  gnupg \
+  fontconfig \
+  unzip \
+  xserver-xorg \
+  xinit \
+  x11-xserver-utils \
+  wlr-randr
 
-# 4. Resolve city -> lat/lon/timezone using Open-Meteo Geocoding API (no key)
+# Hide mouse cursor (kiosk mode)
+sudo apt-get remove -y unclutter || true
+sudo apt-get install -y unclutter-xfixes
+
+# ---------------------------------------------------------------------------
+# 4) Ensure Node.js 18 LTS (better Electron compatibility)
+# ---------------------------------------------------------------------------
+ensure_node18() {
+  local major="0"
+  if command -v node >/dev/null 2>&1; then
+    major="$(node -p 'process.versions.node.split(".")[0]')"
+  fi
+
+  if [[ "$major" != "18" ]]; then
+    echo "Installing Node.js 18 LTS..."
+    # Remove distro node/npm if present to avoid conflicts
+    sudo apt-get remove -y nodejs npm || true
+    curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+    sudo apt-get install -y nodejs
+  fi
+
+  echo "Node: $(node -v)"
+  echo "npm:  $(npm -v)"
+}
+
+ensure_node18
+
+# Make npm downloads more resilient on flaky networks
+npm config set fetch-retries 5 >/dev/null
+npm config set fetch-retry-maxtimeout 120000 >/dev/null
+
+# ---------------------------------------------------------------------------
+# 5) Backup existing config.json (do not reuse automatically)
+# ---------------------------------------------------------------------------
+if [[ -f "$HOME/weather-display/config.json" ]]; then
+  ts="$(date +%Y%m%d-%H%M%S)"
+  mkdir -p "$HOME/weather-display-backups"
+  cp -f "$HOME/weather-display/config.json" "$HOME/weather-display-backups/config.json.$ts.bak"
+  echo "Backed up existing config.json to: ~/weather-display-backups/config.json.$ts.bak"
+fi
+
+# ---------------------------------------------------------------------------
+# 6) Ensure fresh copy of weather-display
+# ---------------------------------------------------------------------------
+echo "Cloning latest version of weather-display from GitHub..."
+rm -rf "$HOME/weather-display"
+git clone https://github.com/Canterrain/weather-display.git "$HOME/weather-display"
+
+# ---------------------------------------------------------------------------
+# 7) Resolve city -> lat/lon/timezone using Open-Meteo Geocoding API (no key)
+# ---------------------------------------------------------------------------
 echo "Resolving location to latitude/longitude/timezone..."
-geo_json=$(python3 - <<PY
+geo_json="$(python3 - <<PY
 import json, urllib.parse, urllib.request, sys, re
 
 raw = ${city@Q}
 
-# Parse inputs like:
-# "Loveland,OH,US"  -> name="Loveland", state="OH", country="US"
-# "Aurora,IN,US"
-# If user enters something else (e.g., "Loveland Ohio"), we still try, but state/country matching may be weaker.
 parts = [p.strip() for p in raw.split(",") if p.strip()]
 name = parts[0] if parts else raw.strip()
 
-state = None
-country = None
-if len(parts) >= 2:
-  state = parts[1]
-if len(parts) >= 3:
-  country = parts[2]
+state = parts[1] if len(parts) >= 2 else None
+country = parts[2] if len(parts) >= 3 else None
 
-# Only pass countryCode if it looks like a 2-letter code (US, CA, etc.)
 countryCodeParam = ""
 if country and re.fullmatch(r"[A-Za-z]{2}", country):
   countryCodeParam = f"&countryCode={urllib.parse.quote(country.upper())}"
@@ -68,9 +145,6 @@ if not results:
   print("")
   sys.exit(0)
 
-# Helper: normalize state input.
-# Open-Meteo returns admin1 as full state name (e.g., "Ohio"), not "OH".
-# So we map common US abbreviations to names for better matching.
 US_STATE = {
   "AL":"Alabama","AK":"Alaska","AZ":"Arizona","AR":"Arkansas","CA":"California","CO":"Colorado","CT":"Connecticut",
   "DE":"Delaware","FL":"Florida","GA":"Georgia","HI":"Hawaii","ID":"Idaho","IL":"Illinois","IN":"Indiana","IA":"Iowa",
@@ -88,39 +162,33 @@ if state:
   if len(s) == 2 and s.upper() in US_STATE:
     want_state_name = US_STATE[s.upper()]
   else:
-    # If they typed "Indiana" etc.
     want_state_name = s
 
 want_name = name.strip().lower()
 
 def score(r):
-  # Higher score wins.
   sc = 0
   r_name = (r.get("name") or "").strip().lower()
   r_admin1 = (r.get("admin1") or "").strip()
   r_cc = (r.get("country_code") or "").strip().upper()
 
-  # Exact name match strongly preferred
   if r_name == want_name:
     sc += 100
   elif want_name and r_name and want_name in r_name:
     sc += 30
 
-  # State match (admin1) if provided
   if want_state_name and r_admin1 and r_admin1.lower() == want_state_name.lower():
     sc += 80
 
-  # Country match if provided
   if country and re.fullmatch(r"[A-Za-z]{2}", country) and r_cc == country.upper():
     sc += 20
 
-  # Prefer more "place-like" entries and higher population when tied
   pop = r.get("population") or 0
   try:
     pop = int(pop)
   except Exception:
     pop = 0
-  sc += min(pop // 1000, 25)  # cap the bonus
+  sc += min(pop // 1000, 25)
 
   return sc
 
@@ -133,12 +201,11 @@ out = {
 }
 print(json.dumps(out))
 PY
-)
+)"
 
-
-lat=$(echo "$geo_json" | python3 -c "import sys, json; s=sys.stdin.read().strip(); print(json.loads(s).get('lat','') if s else '')")
-lon=$(echo "$geo_json" | python3 -c "import sys, json; s=sys.stdin.read().strip(); print(json.loads(s).get('lon','') if s else '')")
-tz=$(echo "$geo_json" | python3 -c "import sys, json; s=sys.stdin.read().strip(); print(json.loads(s).get('timezone','auto') if s else 'auto')")
+lat="$(echo "$geo_json" | python3 -c "import sys, json; s=sys.stdin.read().strip(); print(json.loads(s).get('lat','') if s else '')")"
+lon="$(echo "$geo_json" | python3 -c "import sys, json; s=sys.stdin.read().strip(); print(json.loads(s).get('lon','') if s else '')")"
+tz="$(echo "$geo_json" | python3 -c "import sys, json; s=sys.stdin.read().strip(); print(json.loads(s).get('timezone','auto') if s else 'auto')")"
 
 if [[ -z "$lat" || -z "$lon" ]]; then
   echo "ERROR: Could not resolve lat/lon for '$city'."
@@ -146,8 +213,10 @@ if [[ -z "$lat" || -z "$lon" ]]; then
   exit 1
 fi
 
-# 5. Create config.json
-cat <<EOF > ~/weather-display/config.json
+# ---------------------------------------------------------------------------
+# 8) Create config.json
+# ---------------------------------------------------------------------------
+cat <<EOF > "$HOME/weather-display/config.json"
 {
   "location": "$city",
   "lat": $lat,
@@ -162,48 +231,72 @@ cat <<EOF > ~/weather-display/config.json
 }
 EOF
 
-# 6. Install system dependencies
-echo "Installing system packages..."
-sudo apt-get update
-sudo apt-get install -y nodejs npm git xserver-xorg xinit wlr-randr fontconfig unzip
-
-# 7. Fonts (Roboto Mono from repo folder)
+# ---------------------------------------------------------------------------
+# 9) Fonts (Roboto Mono from repo folder)
+# ---------------------------------------------------------------------------
 echo "Installing Roboto Mono font..."
-mkdir -p ~/.local/share/fonts/RobotoMono
-cp -f ~/weather-display/fonts/RobotoMono/*.ttf ~/.local/share/fonts/RobotoMono/ 2>/dev/null || true
-fc-cache -fv
+mkdir -p "$HOME/.local/share/fonts/RobotoMono"
+cp -f "$HOME/weather-display/fonts/RobotoMono/"*.ttf "$HOME/.local/share/fonts/RobotoMono/" 2>/dev/null || true
+fc-cache -fv >/dev/null || true
 
-# 8. Hide mouse cursor (kiosk mode)
-sudo apt-get remove -y unclutter || true
-sudo apt-get install -y unclutter-xfixes
+# ---------------------------------------------------------------------------
+# 10) Install Node dependencies (reproducible when lockfile exists)
+# ---------------------------------------------------------------------------
+echo "Installing Node dependencies..."
+cd "$HOME/weather-display"
 
-# 9. Install Node.js dependencies
-cd ~/weather-display || exit 1
-npm install electron@28 express@4 node-fetch@2 abort-controller
+if [[ -f package-lock.json ]]; then
+  npm ci
+else
+  npm install
+fi
 
-# 10. Install PM2 globally
+# ---------------------------------------------------------------------------
+# 11) Install PM2 globally
+# ---------------------------------------------------------------------------
+echo "Installing PM2..."
 sudo npm install -g pm2
 
-# 11. Create rotate_display.sh
-cat <<EOF > ~/weather-display/rotate_display.sh
+# ---------------------------------------------------------------------------
+# 12) Create rotate_display.sh (supports Wayland or X11)
+# ---------------------------------------------------------------------------
+cat <<'EOF' > "$HOME/weather-display/rotate_display.sh"
 #!/bin/bash
 set -e
-export DISPLAY=:0
-sleep 8
-DISPLAY_ID=\$(wlr-randr | awk '/^[^ ]/ {output=\$1} /Enabled: yes/ {print output; exit}')
-if [[ -z "\$DISPLAY_ID" ]]; then
-  echo "Could not detect display for rotation."
-  exit 1
-fi
-/usr/bin/wlr-randr --output "\$DISPLAY_ID" --transform 90
-EOF
-chmod +x ~/weather-display/rotate_display.sh
 
-# 12. Setup systemd user service for rotation
-mkdir -p ~/.config/systemd/user
-cat <<EOF > ~/.config/systemd/user/rotate-display.service
+sleep 6
+
+# Wayland/Wayfire (Bookworm default)
+if command -v wlr-randr >/dev/null 2>&1; then
+  DISPLAY_ID=$(wlr-randr | awk '/^[^ ]/ {output=$1} /Enabled: yes/ {print output; exit}')
+  if [[ -n "$DISPLAY_ID" ]]; then
+    wlr-randr --output "$DISPLAY_ID" --transform 90
+    exit 0
+  fi
+fi
+
+# X11
+if command -v xrandr >/dev/null 2>&1; then
+  export DISPLAY=:0
+  OUTPUT=$(xrandr | awk '/ connected/ {print $1; exit}')
+  if [[ -n "$OUTPUT" ]]; then
+    xrandr --output "$OUTPUT" --rotate right
+    exit 0
+  fi
+fi
+
+echo "Could not rotate display (no usable output detected)."
+exit 1
+EOF
+chmod +x "$HOME/weather-display/rotate_display.sh"
+
+# ---------------------------------------------------------------------------
+# 13) Setup systemd user service for rotation
+# ---------------------------------------------------------------------------
+mkdir -p "$HOME/.config/systemd/user"
+cat <<EOF > "$HOME/.config/systemd/user/rotate-display.service"
 [Unit]
-Description=Rotate Display on Boot (Wayland)
+Description=Rotate Display on Boot
 After=graphical-session.target
 
 [Service]
@@ -220,12 +313,16 @@ systemctl --user daemon-reexec
 systemctl --user daemon-reload
 systemctl --user enable rotate-display.service
 
-# 13. Start app via PM2
-chmod +x ~/weather-display/scripts/rwc.sh
-pm2 start ~/weather-display/scripts/rwc.sh --name weather-display
+# ---------------------------------------------------------------------------
+# 14) Start app via PM2
+# ---------------------------------------------------------------------------
+chmod +x "$HOME/weather-display/scripts/rwc.sh"
+pm2 start "$HOME/weather-display/scripts/rwc.sh" --name weather-display
 
-# 14. Enable PM2 to autostart at boot
-pm2StartupCmd=$(pm2 startup systemd -u $USER --hp /home/$USER | grep sudo || true)
+# ---------------------------------------------------------------------------
+# 15) Enable PM2 to autostart at boot
+# ---------------------------------------------------------------------------
+pm2StartupCmd="$(pm2 startup systemd -u "$USER" --hp "/home/$USER" | grep sudo || true)"
 if [[ -n "$pm2StartupCmd" ]]; then
   eval "$pm2StartupCmd"
 fi
@@ -234,3 +331,5 @@ pm2 save
 echo "---------------------------------------"
 echo " Setup complete!"
 echo "---------------------------------------"
+echo "If you ever re-run setup.sh, your previous config.json backups are in:"
+echo "  ~/weather-display-backups/"
