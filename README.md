@@ -24,6 +24,7 @@ A fullscreen clock and weather dashboard designed for Raspberry Pi and the Wisec
 - [Wisecoco HDMI display](https://amzn.to/4cuofSN) (affiliate)
 - [Micro HDMI to HDMI adapter](https://amzn.to/3ZyFOJZ) (affiliate)
 - Raspberry Pi OS (Bookworm recommended)
+- 3D Printed case ([Free STL Here](https://makerworld.com/en/models/2394718-under-cabinet-weather-clock-case#profileId-2623970))
 
 ## 🚀 Quick Start
 
