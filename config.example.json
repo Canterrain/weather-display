@@ -1,8 +1,24 @@
 {
   "location": "Cincinnati,OH,US",
-  "lat": xx.xx,
-  "lon": -xx.xxx,
-  "timezone": "auto",
+  "lat": 39.1031,
+  "lon": -84.5120,
+  "timezone": "America/New_York",
+
   "units": "imperial",
-  "timeFormat": "12"
+
+  "timeFormat": "12",
+  "leadingZero12h": true,
+
+  "thundersnowF": 34,
+  "thundersnowC": 1,
+
+  "recentSnowHours": 2,
+  "recentSnowMm": 0,
+
+  "recentPrecipMinutes": 60,
+  "recentPrecipMm": 0,
+  "recentSnowMm15": 0,
+
+  "snowTempF": 34,
+  "snowTempC": 1
 }
