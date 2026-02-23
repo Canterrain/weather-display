@@ -51,6 +51,58 @@ The setup script will:
 
 
 ---
+## ⚙️ Configuration
+
+The `setup.sh` script automatically creates a `config.json` file.
+
+Example:
+
+```
+{
+  "location": "Cincinnati,OH,US",
+  "lat": xx.xx,
+  "lon": -xx.xxxx,
+  "timezone": "America/New_York",
+  "units": "imperial",
+  "timeFormat": "12",
+  "leadingZero12h": true
+}
+```
+
+### Clock Options
+
+- "timeFormat"
+  
+  - "12" → 12-hour time (7:00 AM)
+  
+  - "24" → 24-hour time (07:00)
+  
+- "leadingZero12h" (12-hour mode only)
+  
+  - true → 07:00 AM
+  
+  - false → 7:00 AM
+
+### Weather Behavior
+
+The system uses Open-Meteo’s current_weather field as the primary source.
+
+Optional tuning values (advanced users):
+
+```
+{
+  "thundersnowF": 34,
+  "thundersnowC": 1,
+  "recentSnowHours": 2,
+  "recentSnowMm": 0
+}
+```
+
+- recentSnowHours
+
+  If measurable snowfall occurred within this window, the snow icon may persist briefly even if precipitation has just stopped.
+
+These defaults are conservative and do not fabricate weather data — they only interpret recent official Open-Meteo measurements.
 
 ## 🖼️ Custom Backgrounds
 
