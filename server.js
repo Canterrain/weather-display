@@ -96,9 +96,46 @@ function isThundersnow(cfg, weathercode, tempNow, tempUnit) {
   return tempNow <= thresholdC;
 }
 
-// Recent snow override:
-// If snowfall > 0 in the last N hours, force current weathercode to "snow" family
-function applyRecentSnowOverride(cfg, currentCode, hourly, nowIso) {
+// --- helpers ---
+function safeDailyValue(arr, i) {
+  if (!Array.isArray(arr)) return null;
+  if (i < 0 || i >= arr.length) return null;
+  return arr[i];
+}
+
+function parseIsoMs(s) {
+  const t = new Date(s).getTime();
+  return Number.isFinite(t) ? t : null;
+}
+
+function findNearestIndexByTime(timeArr, targetIso) {
+  if (!Array.isArray(timeArr) || timeArr.length === 0) return -1;
+  const target = parseIsoMs(targetIso);
+  if (target == null) return -1;
+
+  let bestI = -1;
+  let bestDiff = Infinity;
+  for (let i = 0; i < timeArr.length; i++) {
+    const t = parseIsoMs(timeArr[i]);
+    if (t == null) continue;
+    const diff = Math.abs(t - target);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      bestI = i;
+    }
+  }
+  return bestI;
+}
+
+function getTempThresholdForSnow(cfg, tempUnit) {
+  // Default: 34F / 1C
+  const thresholdF = typeof cfg.snowTempF === 'number' ? cfg.snowTempF : 34;
+  const thresholdC = typeof cfg.snowTempC === 'number' ? cfg.snowTempC : 1;
+  return tempUnit === 'fahrenheit' ? thresholdF : thresholdC;
+}
+
+// Hourly “recent snow wins” fallback (your existing logic, slightly tightened)
+function applyRecentSnowOverrideHourly(cfg, currentCode, hourly, nowIso) {
   const recentHours = typeof cfg.recentSnowHours === 'number' ? cfg.recentSnowHours : 2;
   const snowThreshold = typeof cfg.recentSnowMm === 'number' ? cfg.recentSnowMm : 0;
 
@@ -107,25 +144,11 @@ function applyRecentSnowOverride(cfg, currentCode, hourly, nowIso) {
   const codes = hourly?.weathercode;
 
   if (!Array.isArray(times) || !Array.isArray(snowfall) || !Array.isArray(codes)) {
-    return currentCode;
+    return { code: currentCode, used: false };
   }
 
-  const parse = (s) => new Date(s).getTime();
-  const nowT = parse(nowIso);
-  if (!Number.isFinite(nowT)) return currentCode;
-
-  let bestI = -1;
-  let bestDiff = Infinity;
-  for (let i = 0; i < times.length; i++) {
-    const t = parse(times[i]);
-    if (!Number.isFinite(t)) continue;
-    const diff = Math.abs(t - nowT);
-    if (diff < bestDiff) {
-      bestDiff = diff;
-      bestI = i;
-    }
-  }
-  if (bestI < 0) return currentCode;
+  const bestI = findNearestIndexByTime(times, nowIso);
+  if (bestI < 0) return { code: currentCode, used: false };
 
   const startI = Math.max(0, bestI - recentHours);
 
@@ -137,22 +160,75 @@ function applyRecentSnowOverride(cfg, currentCode, hourly, nowIso) {
     const c = Number(codes[i] ?? -1);
 
     if (s > snowThreshold) sawSnow = true;
-
-    // Snow-ish codes in Open-Meteo: 71-77, 85-86
     if ((c >= 71 && c <= 77) || c === 85 || c === 86) sawSnowCode = true;
   }
 
-  if (!sawSnow && !sawSnowCode) return currentCode;
-
-  // 73 = moderate snow fall (works with your mapping -> snow)
-  return 73;
+  if (!sawSnow && !sawSnowCode) return { code: currentCode, used: false };
+  return { code: 73, used: true }; // moderate snow icon bucket
 }
 
-function safeDailyValue(arr, i) {
-  if (!Array.isArray(arr)) return null;
-  if (i < 0 || i >= arr.length) return null;
-  return arr[i];
+// NEW: Minutely 15 “it is actively precipitating right now” override
+function applyActivePrecipOverrideMinutely(cfg, currentCode, tempNow, tempUnit, min15, nowIso) {
+  const times = min15?.time;
+  const precip = min15?.precipitation; // mm
+  const snowfall = min15?.snowfall;    // mm
+
+  if (!Array.isArray(times) || (!Array.isArray(precip) && !Array.isArray(snowfall))) {
+    return { code: currentCode, used: false, reason: null };
+  }
+
+  const recentMinutes = typeof cfg.recentPrecipMinutes === 'number' ? cfg.recentPrecipMinutes : 60;
+  // Open-Meteo minutely_15 is 15-min resolution => 4 samples per hour
+  const samplesBack = Math.max(1, Math.ceil(recentMinutes / 15));
+
+  const bestI = findNearestIndexByTime(times, nowIso);
+  if (bestI < 0) return { code: currentCode, used: false, reason: null };
+
+  const startI = Math.max(0, bestI - samplesBack);
+
+  const precipThreshold = typeof cfg.recentPrecipMm === 'number' ? cfg.recentPrecipMm : 0; // any >0 by default
+  const snowThreshold = typeof cfg.recentSnowMm15 === 'number' ? cfg.recentSnowMm15 : 0;   // any >0 by default
+
+  let sawAnyPrecip = false;
+  let sawAnySnowfall = false;
+
+  for (let i = startI; i <= bestI; i++) {
+    const p = Array.isArray(precip) ? Number(precip[i] ?? 0) : 0;
+    const s = Array.isArray(snowfall) ? Number(snowfall[i] ?? 0) : 0;
+
+    if (p > precipThreshold) sawAnyPrecip = true;
+    if (s > snowThreshold) sawAnySnowfall = true;
+  }
+
+  if (!sawAnyPrecip && !sawAnySnowfall) {
+    return { code: currentCode, used: false, reason: null };
+  }
+
+  // Decide rain vs snow based on temp
+  const snowTemp = getTempThresholdForSnow(cfg, tempUnit);
+  const isSnowByTemp = tempNow <= snowTemp;
+
+  if (sawAnySnowfall || (sawAnyPrecip && isSnowByTemp)) {
+    return { code: 73, used: true, reason: 'minutely_snow_or_cold_precip' };
+  }
+
+  // Otherwise treat as rain/showers (61 = slight rain, 63 moderate rain)
+  // Pick 61 as a safe “rain” bucket for icons.
+  return { code: 61, used: true, reason: 'minutely_rain' };
 }
+
+// Optional: expose config to frontend (for clock leading-zero option, etc.)
+app.get('/config', (req, res) => {
+  const cfg = loadConfig();
+  if (!cfg) return res.status(500).json({ error: 'Missing config.json' });
+
+  // Only return non-sensitive settings
+  res.json({
+    timeFormat: cfg.timeFormat || cfg.clockFormat || cfg.format || null, // tolerate older keys
+    leadingZero12h: typeof cfg.leadingZero12h === 'boolean' ? cfg.leadingZero12h : true,
+    units: cfg.units || null
+  });
+});
 
 app.get('/weather', async (req, res) => {
   config = loadConfig();
@@ -162,17 +238,17 @@ app.get('/weather', async (req, res) => {
     const cfg = await ensureLatLonTimezone(config);
     const tempUnit = temperatureUnitFromCfg(cfg);
 
-    // We want: today + next 5 days available so we can build 5 forecast entries (tomorrow..+5)
-    // => need at least 6 days total in the daily arrays (index 0..5)
+    // Need enough daily entries so we can build 5 forecast cards (tomorrow..+5)
     const forecastDays = 6;
 
-    // Include sunrise/sunset so the frontend can do true day/night backgrounds.
+    // minutely_15 helps detect active precip (snow/rain) between hourly marks
     const url =
       `https://api.open-meteo.com/v1/forecast` +
       `?latitude=${encodeURIComponent(cfg.lat)}` +
       `&longitude=${encodeURIComponent(cfg.lon)}` +
       `&current_weather=true` +
       `&hourly=weathercode,snowfall` +
+      `&minutely_15=precipitation,snowfall` +
       `&daily=sunrise,sunset,temperature_2m_max,temperature_2m_min,weathercode` +
       `&temperature_unit=${encodeURIComponent(tempUnit)}` +
       `&timezone=${encodeURIComponent(cfg.timezone || 'auto')}` +
@@ -192,6 +268,7 @@ app.get('/weather', async (req, res) => {
     const cur = data.current_weather;
     const daily = data.daily;
     const hourly = data.hourly;
+    const min15 = data.minutely_15;
 
     if (!cur || !daily) throw new Error('Open-Meteo response missing current_weather or daily');
 
@@ -205,8 +282,23 @@ app.get('/weather', async (req, res) => {
     let currentCode = Number(cur.weathercode);
     const isDay = cur.is_day === 1;
 
-    // Apply “recent snow wins” to the CURRENT icon code
-    currentCode = applyRecentSnowOverride(cfg, currentCode, hourly, cur.time);
+    // 1) Prefer minutely override for active precip (fixes “snowing but cloudy”)
+    const minutelyOverride = applyActivePrecipOverrideMinutely(
+      cfg,
+      currentCode,
+      currentTemp,
+      tempUnit,
+      min15,
+      cur.time
+    );
+
+    if (minutelyOverride.used) {
+      currentCode = minutelyOverride.code;
+    } else {
+      // 2) Fallback: your hourly “recent snow wins”
+      const hourlyOverride = applyRecentSnowOverrideHourly(cfg, currentCode, hourly, cur.time);
+      if (hourlyOverride.used) currentCode = hourlyOverride.code;
+    }
 
     const currentThundersnow = isThundersnow(cfg, currentCode, currentTemp, tempUnit);
 
@@ -214,12 +306,10 @@ app.get('/weather', async (req, res) => {
     const fixedHigh = highToday == null ? currentTemp : Math.max(highToday, currentTemp);
     const fixedLow = lowToday == null ? currentTemp : Math.min(lowToday, currentTemp);
 
-    // Today sunrise/sunset (ISO strings from Open-Meteo in the requested timezone)
     const sunriseToday = safeDailyValue(daily.sunrise, 0) || null;
     const sunsetToday = safeDailyValue(daily.sunset, 0) || null;
 
     const forecast = [];
-    // Build exactly 5 forecast entries: tomorrow (1) through +5 (5)
     for (let i = 1; i <= 5; i++) {
       const maxRaw = safeDailyValue(daily.temperature_2m_max, i);
       const minRaw = safeDailyValue(daily.temperature_2m_min, i);
@@ -253,7 +343,6 @@ app.get('/weather', async (req, res) => {
         is_day: isDay,
         thundersnow: currentThundersnow,
 
-        // Additive fields (non-breaking):
         sunrise: sunriseToday,
         sunset: sunsetToday
       },

@@ -30,6 +30,9 @@ read -r -p "Enter your city (e.g., Cincinnati,OH,US): " city
 read -r -p "Choose time format (12 or 24): " timeFormat
 read -r -p "Choose temperature units (imperial or metric): " units
 
+# Only used for 12-hour mode. Default: true.
+leadingZero12h="true"
+
 # ---------------------------------------------------------------------------
 # 2) Validate inputs
 # ---------------------------------------------------------------------------
@@ -39,6 +42,18 @@ fi
 
 if [[ "$units" != "imperial" && "$units" != "metric" ]]; then
   units="imperial"
+fi
+
+# Leading zero prompt only makes sense in 12-hour mode
+if [[ "$timeFormat" == "12" ]]; then
+  # NOTE: Prompt text exactly as requested
+  read -r -p "Show leading zero in 12-hour mode, 07:00 AM instead of 7:00 AM? (Y/n) [Y]: " lz
+  lz="${lz:-Y}"
+  case "$lz" in
+    Y|y) leadingZero12h="true" ;;
+    N|n) leadingZero12h="false" ;;
+    *) leadingZero12h="true" ;;
+  esac
 fi
 
 # ---------------------------------------------------------------------------
@@ -224,6 +239,7 @@ cat <<EOF > "$HOME/weather-display/config.json"
   "timezone": "$tz",
   "units": "$units",
   "timeFormat": "$timeFormat",
+  "leadingZero12h": $leadingZero12h,
   "thundersnowF": 34,
   "thundersnowC": 1,
   "recentSnowHours": 2,
