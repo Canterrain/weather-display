@@ -8,12 +8,10 @@ set -euo pipefail
 #   - Raspberry Pi OS Bookworm (X11 or Wayland)
 #   - Raspberry Pi OS Trixie (Wayland/labwc default)
 #
-# Goals:
-#   - Easy install: "paste commands and you're done"
-#   - Re-running setup refreshes the install by wiping ~/weather-display
-#   - Wayland/labwc: use labwc autostart for rotation, cursor hide, and app start
-#   - X11: keep PM2 + unclutter-xfixes behavior
-#   - Keep Bookworm rotation working (systemd user service calling rotate_display.sh)
+# Branch behavior:
+#   - This script defaults to SETUP_BRANCH (set per-branch copy of setup.sh)
+#   - Override with: WEATHER_BRANCH=os-dual-support bash setup.sh
+#   - Optional:       WEATHER_REPO_URL=https://github.com/Canterrain/weather-display.git
 # -----------------------------------------------------------------------------
 
 echo "-------------------------------"
@@ -35,6 +33,19 @@ if [[ "$ARCH" == "armv7l" ]]; then
   echo "Electron installs can fail on 32-bit. Strongly recommend 64-bit Raspberry Pi OS (aarch64)."
   echo "Continuing anyway..."
 fi
+
+# -----------------------------------------------------------------------------
+# Branch selection
+#
+# IMPORTANT:
+#   In the os-dual-support branch copy of setup.sh, set:
+#     SETUP_BRANCH="os-dual-support"
+#   In main branch setup.sh, keep:
+#     SETUP_BRANCH="main"
+# -----------------------------------------------------------------------------
+SETUP_BRANCH="main"
+REPO_BRANCH="${WEATHER_BRANCH:-$SETUP_BRANCH}"
+REPO_URL="${WEATHER_REPO_URL:-https://github.com/Canterrain/weather-display.git}"
 
 # -----------------------------------------------------------------------------
 # Config prompts
@@ -84,6 +95,8 @@ detect_session_type() {
       return
     fi
     if [[ "${VERSION_CODENAME:-}" == "bookworm" ]]; then
+      # Bookworm can be Wayland or X11, but if we're in SSH with no GUI env,
+      # assume X11 (your existing, known-good path).
       echo "x11"
       return
     fi
@@ -128,18 +141,18 @@ else
 fi
 
 # -----------------------------------------------------------------------------
-# Node.js 18 LTS (matches repo engines and avoids EBADENGINE on Bookworm)
+# Node.js 20 LTS (NodeSource)
 # -----------------------------------------------------------------------------
-ensure_node18() {
+ensure_node20() {
   local major="0"
   if command -v node >/dev/null 2>&1; then
     major="$(node -p 'process.versions.node.split(".")[0]')"
   fi
 
-  if [[ "$major" != "18" ]]; then
-    echo "Installing Node.js 18 LTS..."
+  if [[ "$major" != "20" ]]; then
+    echo "Installing Node.js 20 LTS..."
     sudo apt-get remove -y nodejs npm || true
-    curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
     sudo apt-get install -y nodejs
   fi
 
@@ -147,7 +160,7 @@ ensure_node18() {
   echo "npm:  $(npm -v)"
 }
 
-ensure_node18
+ensure_node20
 
 # Make npm downloads more resilient on flaky networks
 npm config set fetch-retries 5 >/dev/null 2>&1 || true
@@ -179,9 +192,9 @@ if [[ "$(pwd -P)" == "$TARGET_DIR"* ]]; then
   exec bash "$tmp"
 fi
 
-echo "Cloning latest version of weather-display from GitHub..."
+echo "Cloning weather-display from GitHub..."
 rm -rf "$TARGET_DIR"
-git clone https://github.com/Canterrain/weather-display.git "$TARGET_DIR"
+git clone --branch "$REPO_BRANCH" --single-branch "$REPO_URL" "$TARGET_DIR"
 
 # -----------------------------------------------------------------------------
 # Resolve city -> lat/lon/timezone via Open-Meteo Geocoding API
@@ -326,55 +339,27 @@ fi
 # -----------------------------------------------------------------------------
 # Ensure scripts are executable
 # -----------------------------------------------------------------------------
-chmod +x "$TARGET_DIR/scripts/rwc.sh" || true
+chmod +x "$TARGET_DIR/scripts/rwc.sh" 2>/dev/null || true
+chmod +x "$TARGET_DIR/rotate_display.sh" 2>/dev/null || true
 
 # -----------------------------------------------------------------------------
-# X11 rotation: restore the old working model (rotate_display.sh + user service)
+# X11 rotation: systemd --user service that calls repo rotate_display.sh
+# (Rewrite the unit every run so it stays in sync for everyone.)
 # -----------------------------------------------------------------------------
 setup_x11_rotation_service() {
-  cat <<'EOF' > "$TARGET_DIR/rotate_display.sh"
-#!/bin/bash
-set -e
-
-sleep 6
-
-# Wayland (harmless if present)
-if command -v wlr-randr >/dev/null 2>&1; then
-  DISPLAY_ID=$(wlr-randr | awk '/^[^ ]/ {output=$1} /Enabled: yes/ {print output; exit}')
-  if [[ -n "$DISPLAY_ID" ]]; then
-    wlr-randr --output "$DISPLAY_ID" --transform 90
-    exit 0
-  fi
-fi
-
-# X11
-if command -v xrandr >/dev/null 2>&1; then
-  export DISPLAY=:0
-  OUTPUT=$(xrandr | awk '/ connected/ {print $1; exit}')
-  if [[ -n "$OUTPUT" ]]; then
-    xrandr --output "$OUTPUT" --rotate right
-    exit 0
-  fi
-fi
-
-echo "Could not rotate display (no usable output detected)."
-exit 1
-EOF
-  chmod +x "$TARGET_DIR/rotate_display.sh"
-
   mkdir -p "$HOME/.config/systemd/user"
+
   cat <<'EOF' > "$HOME/.config/systemd/user/rotate-display.service"
 [Unit]
 Description=Rotate Display on Boot
-After=graphical-session.target
+After=graphical-session.target graphical.target
 
 [Service]
-Type=simple
+Type=oneshot
 Environment=DISPLAY=:0
 Environment=XAUTHORITY=%h/.Xauthority
 ExecStart=%h/weather-display/rotate_display.sh
-TimeoutSec=30
-Restart=on-failure
+TimeoutSec=120
 
 [Install]
 WantedBy=default.target
@@ -382,12 +367,16 @@ EOF
 
   systemctl --user daemon-reload
   systemctl --user enable rotate-display.service >/dev/null 2>&1 || true
+
+  # Try once now (won't fail the install if it can't rotate yet)
+  systemctl --user restart rotate-display.service >/dev/null 2>&1 || true
 }
 
 # -----------------------------------------------------------------------------
-# Helper scripts (Wayland rotation + restart) - DO NOT COMMIT restart.sh long-term
+# Wayland helpers
 # -----------------------------------------------------------------------------
-cat <<'EOF' > "$TARGET_DIR/scripts/rotate_wayland.sh"
+create_wayland_helpers() {
+  cat <<'EOF' > "$TARGET_DIR/scripts/rotate_wayland.sh"
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -404,28 +393,8 @@ if [[ -n "${out:-}" ]]; then
   wlr-randr --output "$out" --transform 90 || true
 fi
 EOF
-chmod +x "$TARGET_DIR/scripts/rotate_wayland.sh"
-
-cat <<'EOF' > "$TARGET_DIR/scripts/restart.sh"
-#!/usr/bin/env bash
-set -euo pipefail
-
-APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-RWC="$APP_DIR/scripts/rwc.sh"
-
-echo "[restart] Stopping weather display..."
-pkill -f "$RWC" 2>/dev/null || true
-pkill -f "electron.*localhost:3000" 2>/dev/null || true
-pkill -f "node .*${APP_DIR}.*server\.js" 2>/dev/null || true
-
-sleep 1
-
-echo "[restart] Starting weather display..."
-nohup bash "$RWC" >/tmp/weather-display-restart.log 2>&1 & disown
-
-echo "[restart] Done. Log: /tmp/weather-display-restart.log"
-EOF
-chmod +x "$TARGET_DIR/scripts/restart.sh"
+  chmod +x "$TARGET_DIR/scripts/rotate_wayland.sh"
+}
 
 # -----------------------------------------------------------------------------
 # Autostart configuration
@@ -499,25 +468,34 @@ configure_x11_pm2() {
   pm2 save
 }
 
+# -----------------------------------------------------------------------------
+# Apply session-specific setup
+# -----------------------------------------------------------------------------
 if [[ "$SESSION_TYPE" == "wayland" ]]; then
+  # Don't rely on PM2 boot services on labwc
   sudo systemctl disable pm2-"$USER" >/dev/null 2>&1 || true
+
+  create_wayland_helpers
   configure_labwc_wayland
 else
   setup_x11_rotation_service
   configure_x11_pm2
 fi
 
+# -----------------------------------------------------------------------------
+# Done
+# -----------------------------------------------------------------------------
 echo "---------------------------------------"
 echo " Setup complete!"
 echo "---------------------------------------"
 echo "Installed to: $TARGET_DIR"
-echo "Restart script: $TARGET_DIR/scripts/restart.sh"
+echo "Branch: $REPO_BRANCH"
 echo "If you ever re-run setup.sh, your previous config.json backups are in:"
 echo "  ~/weather-display-backups/"
 echo ""
 
 if [[ "$SESSION_TYPE" == "wayland" ]]; then
-  echo "NOTE: On Wayland/labwc, the display auto-starts via labwc autostart."
+  echo "NOTE (Trixie/labwc): auto-start is handled by labwc autostart."
 fi
 
 echo ""
