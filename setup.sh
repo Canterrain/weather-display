@@ -339,7 +339,7 @@ fi
 # -----------------------------------------------------------------------------
 # Ensure scripts are executable
 # -----------------------------------------------------------------------------
-chmod +x "$TARGET_DIR/scripts/rwc.sh" 2>/dev/null || true
+chmod +x "$TARGET_DIR/scripts/"*.sh 2>/dev/null || true
 chmod +x "$TARGET_DIR/rotate_display.sh" 2>/dev/null || true
 
 # -----------------------------------------------------------------------------
