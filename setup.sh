@@ -482,7 +482,13 @@ echo "Restart script: $TARGET_DIR/scripts/restart.sh"
 echo "If you ever re-run setup.sh, your previous config.json backups are in:"
 echo "  ~/weather-display-backups/"
 echo ""
+
 if [[ "$SESSION_TYPE" == "wayland" ]]; then
   echo "NOTE: On Wayland/labwc, the display auto-starts via labwc autostart."
-  echo "If you don't see it after reboot, log out/in once or reboot again."
 fi
+
+echo ""
+echo "IMPORTANT:"
+echo "A reboot is required to start the display automatically."
+echo "Run: sudo reboot"
+echo ""
