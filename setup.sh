@@ -9,9 +9,11 @@ set -euo pipefail
 #   - Raspberry Pi OS Trixie (Wayland/labwc default)
 #
 # Branch behavior:
-#   - This script defaults to SETUP_BRANCH (set per-branch copy of setup.sh)
-#   - Override with: WEATHER_BRANCH=os-dual-support bash setup.sh
-#   - Optional:       WEATHER_REPO_URL=https://github.com/Canterrain/weather-display.git
+#   - Defaults to main.
+#   - Override with:
+#       WEATHER_BRANCH=<branch> bash setup.sh
+#   - Optional:
+#       WEATHER_REPO_URL=<repo url>
 # -----------------------------------------------------------------------------
 
 echo "-------------------------------"
