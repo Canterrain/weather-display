@@ -37,11 +37,12 @@ fi
 # -----------------------------------------------------------------------------
 # Branch selection
 #
-# IMPORTANT:
-#   In the os-dual-support branch copy of setup.sh, set:
-#     SETUP_BRANCH="os-dual-support"
-#   In main branch setup.sh, keep:
-#     SETUP_BRANCH="main"
+# Defaults to main.
+# Override with:
+#   WEATHER_BRANCH=<branch> bash setup.sh
+#
+# Optional:
+#   WEATHER_REPO_URL=<repo url>
 # -----------------------------------------------------------------------------
 SETUP_BRANCH="main"
 REPO_BRANCH="${WEATHER_BRANCH:-$SETUP_BRANCH}"
