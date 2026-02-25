@@ -1,15 +1,26 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
+
+# -----------------------------------------------------------------------------
+# Clock Weather Display Setup
+#
+# Supports:
+#   - Raspberry Pi OS Bookworm (X11 or Wayland)
+#   - Raspberry Pi OS Trixie (Wayland/labwc default)
+#
+# Branch behavior:
+#   - This script defaults to SETUP_BRANCH (set per-branch copy of setup.sh)
+#   - Override with: WEATHER_BRANCH=os-dual-support bash setup.sh
+#   - Optional:       WEATHER_REPO_URL=https://github.com/Canterrain/weather-display.git
+# -----------------------------------------------------------------------------
 
 echo "-------------------------------"
 echo "Clock Weather Display Setup"
 echo "-------------------------------"
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Guardrails
-# ---------------------------------------------------------------------------
-
-# Do not run the whole script as root (breaks npm/pm2 paths and installs into /root)
+# -----------------------------------------------------------------------------
 if [[ "${EUID}" -eq 0 ]]; then
   echo "ERROR: Do not run this script with sudo."
   echo "Run: bash setup.sh"
@@ -23,42 +34,84 @@ if [[ "$ARCH" == "armv7l" ]]; then
   echo "Continuing anyway..."
 fi
 
-# ---------------------------------------------------------------------------
-# 1) Prompt for config
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# Branch selection
+#
+# Defaults to main.
+# Override with:
+#   WEATHER_BRANCH=<branch> bash setup.sh
+#
+# Optional:
+#   WEATHER_REPO_URL=<repo url>
+# -----------------------------------------------------------------------------
+SETUP_BRANCH="main"
+REPO_BRANCH="${WEATHER_BRANCH:-$SETUP_BRANCH}"
+REPO_URL="${WEATHER_REPO_URL:-https://github.com/Canterrain/weather-display.git}"
+
+# -----------------------------------------------------------------------------
+# Config prompts
+# -----------------------------------------------------------------------------
 read -r -p "Enter your city (e.g., Cincinnati,OH,US): " city
 read -r -p "Choose time format (12 or 24): " timeFormat
 read -r -p "Choose temperature units (imperial or metric): " units
 
-# Only used for 12-hour mode. Default: true.
 leadingZero12h="true"
 
-# ---------------------------------------------------------------------------
-# 2) Validate inputs
-# ---------------------------------------------------------------------------
 if [[ "$timeFormat" != "12" && "$timeFormat" != "24" ]]; then
   timeFormat="12"
 fi
-
 if [[ "$units" != "imperial" && "$units" != "metric" ]]; then
   units="imperial"
 fi
 
-# Leading zero prompt only makes sense in 12-hour mode
 if [[ "$timeFormat" == "12" ]]; then
-  # NOTE: Prompt text exactly as requested
   read -r -p "Show leading zero in 12-hour mode, 07:00 AM instead of 7:00 AM? (Y/n) [Y]: " lz
   lz="${lz:-Y}"
   case "$lz" in
     Y|y) leadingZero12h="true" ;;
     N|n) leadingZero12h="false" ;;
-    *) leadingZero12h="true" ;;
+    *)   leadingZero12h="true" ;;
   esac
 fi
 
-# ---------------------------------------------------------------------------
-# 3) Install system dependencies (base)
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# Detect session (Wayland vs X11)
+# -----------------------------------------------------------------------------
+detect_session_type() {
+  if [[ "${XDG_SESSION_TYPE:-}" == "wayland" || -n "${WAYLAND_DISPLAY:-}" ]]; then
+    echo "wayland"
+    return
+  fi
+  if [[ "${XDG_SESSION_TYPE:-}" == "x11" || -n "${DISPLAY:-}" ]]; then
+    echo "x11"
+    return
+  fi
+
+  # If run over SSH, infer from OS codename
+  if [[ -f /etc/os-release ]]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    if [[ "${VERSION_CODENAME:-}" == "trixie" ]]; then
+      echo "wayland"
+      return
+    fi
+    if [[ "${VERSION_CODENAME:-}" == "bookworm" ]]; then
+      # Bookworm can be Wayland or X11, but if we're in SSH with no GUI env,
+      # assume X11 (your existing, known-good path).
+      echo "x11"
+      return
+    fi
+  fi
+
+  echo "x11"
+}
+
+SESSION_TYPE="$(detect_session_type)"
+echo "Detected session type: $SESSION_TYPE"
+
+# -----------------------------------------------------------------------------
+# Install system dependencies
+# -----------------------------------------------------------------------------
 echo "Installing system packages..."
 sudo apt-get update
 sudo apt-get install -y \
@@ -70,29 +123,37 @@ sudo apt-get install -y \
   gnupg \
   fontconfig \
   unzip \
-  xserver-xorg \
-  xinit \
-  x11-xserver-utils \
   wlr-randr
 
-# Hide mouse cursor (kiosk mode)
-sudo apt-get remove -y unclutter || true
-sudo apt-get install -y unclutter-xfixes
+# X11 packages only when needed
+if [[ "$SESSION_TYPE" == "x11" ]]; then
+  sudo apt-get install -y \
+    xserver-xorg \
+    xinit \
+    x11-xserver-utils
+fi
 
-# ---------------------------------------------------------------------------
-# 4) Ensure Node.js 18 LTS (better Electron compatibility)
-# ---------------------------------------------------------------------------
-ensure_node18() {
+# Cursor hide dependencies
+if [[ "$SESSION_TYPE" == "x11" ]]; then
+  sudo apt-get remove -y unclutter || true
+  sudo apt-get install -y unclutter-xfixes
+else
+  sudo apt-get install -y wtype
+fi
+
+# -----------------------------------------------------------------------------
+# Node.js 20 LTS (NodeSource)
+# -----------------------------------------------------------------------------
+ensure_node20() {
   local major="0"
   if command -v node >/dev/null 2>&1; then
     major="$(node -p 'process.versions.node.split(".")[0]')"
   fi
 
-  if [[ "$major" != "18" ]]; then
-    echo "Installing Node.js 18 LTS..."
-    # Remove distro node/npm if present to avoid conflicts
+  if [[ "$major" != "20" ]]; then
+    echo "Installing Node.js 20 LTS..."
     sudo apt-get remove -y nodejs npm || true
-    curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
     sudo apt-get install -y nodejs
   fi
 
@@ -100,32 +161,45 @@ ensure_node18() {
   echo "npm:  $(npm -v)"
 }
 
-ensure_node18
+ensure_node20
 
 # Make npm downloads more resilient on flaky networks
-npm config set fetch-retries 5 >/dev/null
-npm config set fetch-retry-maxtimeout 120000 >/dev/null
+npm config set fetch-retries 5 >/dev/null 2>&1 || true
+npm config set fetch-retry-maxtimeout 120000 >/dev/null 2>&1 || true
 
-# ---------------------------------------------------------------------------
-# 5) Backup existing config.json (do not reuse automatically)
-# ---------------------------------------------------------------------------
-if [[ -f "$HOME/weather-display/config.json" ]]; then
+# -----------------------------------------------------------------------------
+# Backup existing config.json before refresh
+# -----------------------------------------------------------------------------
+TARGET_DIR="$HOME/weather-display"
+
+if [[ -f "$TARGET_DIR/config.json" ]]; then
   ts="$(date +%Y%m%d-%H%M%S)"
   mkdir -p "$HOME/weather-display-backups"
-  cp -f "$HOME/weather-display/config.json" "$HOME/weather-display-backups/config.json.$ts.bak"
+  cp -f "$TARGET_DIR/config.json" "$HOME/weather-display-backups/config.json.$ts.bak"
   echo "Backed up existing config.json to: ~/weather-display-backups/config.json.$ts.bak"
 fi
 
-# ---------------------------------------------------------------------------
-# 6) Ensure fresh copy of weather-display
-# ---------------------------------------------------------------------------
-echo "Cloning latest version of weather-display from GitHub..."
-rm -rf "$HOME/weather-display"
-git clone https://github.com/Canterrain/weather-display.git "$HOME/weather-display"
+# -----------------------------------------------------------------------------
+# Refresh install: wipe + clone latest
+# Safe even if user ran setup from inside the folder
+# -----------------------------------------------------------------------------
+if [[ "$(pwd -P)" == "$TARGET_DIR"* ]]; then
+  echo "Setup is running from inside $TARGET_DIR."
+  echo "Re-launching from HOME so refresh can proceed safely..."
+  tmp="/tmp/weather-display-setup.sh"
+  cp -f "$0" "$tmp"
+  chmod +x "$tmp"
+  cd "$HOME"
+  exec bash "$tmp"
+fi
 
-# ---------------------------------------------------------------------------
-# 7) Resolve city -> lat/lon/timezone using Open-Meteo Geocoding API (no key)
-# ---------------------------------------------------------------------------
+echo "Cloning weather-display from GitHub..."
+rm -rf "$TARGET_DIR"
+git clone --branch "$REPO_BRANCH" --single-branch "$REPO_URL" "$TARGET_DIR"
+
+# -----------------------------------------------------------------------------
+# Resolve city -> lat/lon/timezone via Open-Meteo Geocoding API
+# -----------------------------------------------------------------------------
 echo "Resolving location to latitude/longitude/timezone..."
 geo_json="$(python3 - <<PY
 import json, urllib.parse, urllib.request, sys, re
@@ -228,10 +302,7 @@ if [[ -z "$lat" || -z "$lon" ]]; then
   exit 1
 fi
 
-# ---------------------------------------------------------------------------
-# 8) Create config.json
-# ---------------------------------------------------------------------------
-cat <<EOF > "$HOME/weather-display/config.json"
+cat <<EOF > "$TARGET_DIR/config.json"
 {
   "location": "$city",
   "lat": $lat,
@@ -247,105 +318,189 @@ cat <<EOF > "$HOME/weather-display/config.json"
 }
 EOF
 
-# ---------------------------------------------------------------------------
-# 9) Fonts (Roboto Mono from repo folder)
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# Fonts
+# -----------------------------------------------------------------------------
 echo "Installing Roboto Mono font..."
 mkdir -p "$HOME/.local/share/fonts/RobotoMono"
-cp -f "$HOME/weather-display/fonts/RobotoMono/"*.ttf "$HOME/.local/share/fonts/RobotoMono/" 2>/dev/null || true
+cp -f "$TARGET_DIR/fonts/RobotoMono/"*.ttf "$HOME/.local/share/fonts/RobotoMono/" 2>/dev/null || true
 fc-cache -fv >/dev/null || true
 
-# ---------------------------------------------------------------------------
-# 10) Install Node dependencies (reproducible when lockfile exists)
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# Node dependencies
+# -----------------------------------------------------------------------------
 echo "Installing Node dependencies..."
-cd "$HOME/weather-display"
-
+cd "$TARGET_DIR"
 if [[ -f package-lock.json ]]; then
   npm ci
 else
   npm install
 fi
 
-# ---------------------------------------------------------------------------
-# 11) Install PM2 globally
-# ---------------------------------------------------------------------------
-echo "Installing PM2..."
-sudo npm install -g pm2
+# -----------------------------------------------------------------------------
+# Ensure scripts are executable
+# -----------------------------------------------------------------------------
+chmod +x "$TARGET_DIR/scripts/"*.sh 2>/dev/null || true
+chmod +x "$TARGET_DIR/rotate_display.sh" 2>/dev/null || true
 
-# ---------------------------------------------------------------------------
-# 12) Create rotate_display.sh (supports Wayland or X11)
-# ---------------------------------------------------------------------------
-cat <<'EOF' > "$HOME/weather-display/rotate_display.sh"
-#!/bin/bash
-set -e
+# -----------------------------------------------------------------------------
+# X11 rotation: systemd --user service that calls repo rotate_display.sh
+# (Rewrite the unit every run so it stays in sync for everyone.)
+# -----------------------------------------------------------------------------
+setup_x11_rotation_service() {
+  mkdir -p "$HOME/.config/systemd/user"
 
-sleep 6
-
-# Wayland/Wayfire (Bookworm default)
-if command -v wlr-randr >/dev/null 2>&1; then
-  DISPLAY_ID=$(wlr-randr | awk '/^[^ ]/ {output=$1} /Enabled: yes/ {print output; exit}')
-  if [[ -n "$DISPLAY_ID" ]]; then
-    wlr-randr --output "$DISPLAY_ID" --transform 90
-    exit 0
-  fi
-fi
-
-# X11
-if command -v xrandr >/dev/null 2>&1; then
-  export DISPLAY=:0
-  OUTPUT=$(xrandr | awk '/ connected/ {print $1; exit}')
-  if [[ -n "$OUTPUT" ]]; then
-    xrandr --output "$OUTPUT" --rotate right
-    exit 0
-  fi
-fi
-
-echo "Could not rotate display (no usable output detected)."
-exit 1
-EOF
-chmod +x "$HOME/weather-display/rotate_display.sh"
-
-# ---------------------------------------------------------------------------
-# 13) Setup systemd user service for rotation
-# ---------------------------------------------------------------------------
-mkdir -p "$HOME/.config/systemd/user"
-cat <<EOF > "$HOME/.config/systemd/user/rotate-display.service"
+  cat <<'EOF' > "$HOME/.config/systemd/user/rotate-display.service"
 [Unit]
 Description=Rotate Display on Boot
-After=graphical-session.target
+After=graphical-session.target graphical.target
 
 [Service]
-Type=simple
-ExecStart=/home/$USER/weather-display/rotate_display.sh
-TimeoutSec=30
-Restart=on-failure
+Type=oneshot
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=%h/.Xauthority
+ExecStart=%h/weather-display/rotate_display.sh
+TimeoutSec=120
 
 [Install]
 WantedBy=default.target
 EOF
 
-systemctl --user daemon-reexec
-systemctl --user daemon-reload
-systemctl --user enable rotate-display.service
+  systemctl --user daemon-reload
+  systemctl --user enable rotate-display.service >/dev/null 2>&1 || true
 
-# ---------------------------------------------------------------------------
-# 14) Start app via PM2
-# ---------------------------------------------------------------------------
-chmod +x "$HOME/weather-display/scripts/rwc.sh"
-pm2 start "$HOME/weather-display/scripts/rwc.sh" --name weather-display
+  # Try once now (won't fail the install if it can't rotate yet)
+  systemctl --user restart rotate-display.service >/dev/null 2>&1 || true
+}
 
-# ---------------------------------------------------------------------------
-# 15) Enable PM2 to autostart at boot
-# ---------------------------------------------------------------------------
-pm2StartupCmd="$(pm2 startup systemd -u "$USER" --hp "/home/$USER" | grep sudo || true)"
-if [[ -n "$pm2StartupCmd" ]]; then
-  eval "$pm2StartupCmd"
+# -----------------------------------------------------------------------------
+# Wayland helpers
+# -----------------------------------------------------------------------------
+create_wayland_helpers() {
+  cat <<'EOF' > "$TARGET_DIR/scripts/rotate_wayland.sh"
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v wlr-randr >/dev/null 2>&1; then
+  exit 0
 fi
-pm2 save
 
+out="$(wlr-randr | awk '
+  /^[^ ]/ {o=$1}
+  /Enabled: yes/ {print o; exit}
+')"
+
+if [[ -n "${out:-}" ]]; then
+  wlr-randr --output "$out" --transform 90 || true
+fi
+EOF
+  chmod +x "$TARGET_DIR/scripts/rotate_wayland.sh"
+}
+
+# -----------------------------------------------------------------------------
+# Autostart configuration
+# -----------------------------------------------------------------------------
+configure_labwc_wayland() {
+  echo "Configuring labwc (Wayland) autostart, rotation, and cursor hiding..."
+
+  mkdir -p "$HOME/.config/labwc"
+
+  rc="$HOME/.config/labwc/rc.xml"
+  if [[ -f "$rc" ]]; then
+    ts="$(date +%Y%m%d-%H%M%S)"
+    cp -f "$rc" "$rc.bak.$ts"
+  else
+    cat <<'XML' > "$rc"
+<?xml version="1.0"?>
+<openbox_config xmlns="http://openbox.org/3.4/rc">
+</openbox_config>
+XML
+  fi
+
+  if ! grep -q 'action name="HideCursor"' "$rc"; then
+    tmp_rc="$(mktemp)"
+    awk '
+      BEGIN { inserted=0 }
+      /<\/openbox_config>/ && inserted==0 {
+        print ""
+        print "  <keyboard>"
+        print "    <keybind key=\"A-W-h\">"
+        print "      <action name=\"HideCursor\" />"
+        print "      <action name=\"WarpCursor\" x=\"-1\" y=\"-1\" />"
+        print "    </keybind>"
+        print "  </keyboard>"
+        print ""
+        inserted=1
+      }
+      { print }
+    ' "$rc" > "$tmp_rc"
+    mv "$tmp_rc" "$rc"
+  fi
+
+  aut="$HOME/.config/labwc/autostart"
+  touch "$aut"
+
+  add_line() {
+    local line="$1"
+    grep -Fqx "$line" "$aut" 2>/dev/null || echo "$line" >> "$aut"
+  }
+
+  add_line "bash \"$TARGET_DIR/scripts/rotate_wayland.sh\" &"
+  add_line "wtype -M alt -M logo h -m alt -m logo &"
+  add_line "bash \"$TARGET_DIR/scripts/rwc.sh\" &"
+
+  echo "labwc configuration updated:"
+  echo "  $rc"
+  echo "  $aut"
+}
+
+configure_x11_pm2() {
+  echo "Configuring X11 autostart via PM2..."
+
+  echo "Installing PM2..."
+  sudo npm install -g pm2
+
+  pm2 start "$TARGET_DIR/scripts/rwc.sh" --name weather-display || true
+
+  pm2StartupCmd="$(pm2 startup systemd -u "$USER" --hp "/home/$USER" | grep sudo || true)"
+  if [[ -n "$pm2StartupCmd" ]]; then
+    eval "$pm2StartupCmd"
+  fi
+  pm2 save
+}
+
+# -----------------------------------------------------------------------------
+# Apply session-specific setup
+# -----------------------------------------------------------------------------
+if [[ "$SESSION_TYPE" == "wayland" ]]; then
+  # Don't rely on PM2 boot services on labwc
+  sudo systemctl disable pm2-"$USER" >/dev/null 2>&1 || true
+
+  create_wayland_helpers
+  configure_labwc_wayland
+else
+  setup_x11_rotation_service
+  configure_x11_pm2
+fi
+
+# -----------------------------------------------------------------------------
+# Done
+# -----------------------------------------------------------------------------
 echo "---------------------------------------"
 echo " Setup complete!"
 echo "---------------------------------------"
+echo "Installed to: $TARGET_DIR"
+echo "Branch: $REPO_BRANCH"
 echo "If you ever re-run setup.sh, your previous config.json backups are in:"
 echo "  ~/weather-display-backups/"
+echo ""
+
+if [[ "$SESSION_TYPE" == "wayland" ]]; then
+  echo "NOTE (Trixie/labwc): auto-start is handled by labwc autostart."
+fi
+
+echo ""
+echo "IMPORTANT:"
+echo "A reboot is required to start the display automatically."
+echo "Run: sudo reboot"
+echo ""

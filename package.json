@@ -8,7 +8,7 @@
     "start": "electron ."
   },
   "engines": {
-    "node": ">=18 <19",
+    "node": ">=18 <21",
     "npm": ">=9"
   },
   "dependencies": {
