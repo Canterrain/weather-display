@@ -14,16 +14,20 @@ A fullscreen clock and weather dashboard designed for Raspberry Pi and the Wisec
 - Optional background images with day/night support
 - Auto-start with PM2 on boot
 - Clean, modern layout designed for 1920×480 displays
+- Works on both X11 (Bookworm) and Wayland/labwc (Trixie)
 
 ## 🖥 Requirements
 
 - [Raspberry Pi 4](https://amzn.to/40en56s) (affiliate)
 - or
 - [Raspberry Pi 5](https://amzn.to/3ZEJUQH) (affiliate)
+- Raspberry Pi 3B may work on Bookworm only (not recommended for Trixie)
 - [Rasperry Pi Power Supply](https://amzn.to/3MvrPBF) (affiliate)
 - [Wisecoco HDMI display](https://amzn.to/4cuofSN) (affiliate)
 - [Micro HDMI to HDMI adapter](https://amzn.to/3ZyFOJZ) (affiliate)
-- Raspberry Pi OS (Bookworm recommended)
+- Raspberry Pi OS 64-bit:
+  - Bookworm (X11 or Wayland)
+  - Trixie (Wayland/labwc default)
 - 3D Printed case ([Free STL Here](https://makerworld.com/en/models/2394718-under-cabinet-weather-clock-case#profileId-2623970))
 
 ## 🚀 Quick Start
@@ -33,22 +37,27 @@ A fullscreen clock and weather dashboard designed for Raspberry Pi and the Wisec
 ```
 wget https://raw.githubusercontent.com/Canterrain/weather-display/main/setup.sh
 ```
-```
-chmod +x setup.sh
-```
 * Install the software: 
 ```
-./setup.sh
+bash setup.sh
+```
+* Reboot Raspberry Pi
+```
+sudo reboot
 ```
 
-The setup script will:
+## What This Script Does
 
-- Install all required system and Node.js dependencies
-- Set up screen rotation for landscape-oriented displays
-- Configure PM2 to auto-launch the app at boot
-
-💡 After setup finishes, everything should work automatically without reboot.
-
+- Installs required system dependencies
+- Installs Node.js 20 LTS
+ -Installs and configures the app
+- Detects Bookworm vs Trixie automatically
+- Configures screen rotation
+- Configures auto-start:
+  - Bookworm (X11): PM2
+  - Trixie (Wayland/labwc): labwc autostart
+- Sets up fonts and weather configuration
+- After reboot, the display should launch automatically.
 
 ---
 ## ⚙️ Configuration
