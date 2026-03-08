@@ -325,7 +325,7 @@ app.get('/weather', async (req, res) => {
       const thundersnow = isThundersnow(cfg, code, mid, tempUnit);
 
       forecast.push({
-        temp: mid,
+        temp: max,
         high: max,
         low: min,
         code,
