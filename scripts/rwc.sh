@@ -25,7 +25,7 @@ else
 fi
 
 # Start the Express server
-node server.js &
+node --network-family-autoselection-attempt-timeout=500 server.js &
 
 # Wait for server to be ready (max ~30s)
 for _ in {1..30}; do
