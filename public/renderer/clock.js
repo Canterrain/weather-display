@@ -153,7 +153,7 @@ function Clock() {
   updateDay();
 
   setInterval(updateClock, 1000);
-  setInterval(updateDay, 60 * 60 * 1000);
+  setInterval(updateDay, 60 * 1000);
 
   // Re-fetch config occasionally in case you change it (safe, low cost)
   setInterval(async () => {
