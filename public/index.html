@@ -7,34 +7,63 @@
   <link rel="stylesheet" href="style.css"/>
 </head>
 <body class="default-background">
-  <div class="container">
-    <div class="time-section">
-      <div id="time"></div> <!-- EMPTY on load -->
-      <div id="day"></div>  <!-- EMPTY on load -->
-    </div>
-    <div class="weather-section">
-      <div class="current-weather">
-        <img id="current-icon" src="assets/icons/clear-day.svg" alt="Weather Icon"/>
-        <div class="temp-stack">
-          <div id="current-temp">--°</div>
-          <div id="high-low">
-            <div class="hl-row">
-              <span class="hl-label">H</span>
-              <span id="high">--°</span>
+  <main class="app-shell mode-dashboard">
+    <section class="display-stage" aria-label="Landscape weather clock">
+      <div class="view-layer view-dashboard" aria-hidden="false">
+        <div class="block-c-indicator" id="message-indicator" aria-hidden="true">
+          <span class="block-c-glow block-c-glow-top"></span>
+          <span class="block-c-glow block-c-glow-left"></span>
+          <span class="block-c-glow block-c-glow-bottom"></span>
+          <span class="block-c block-c-top"></span>
+          <span class="block-c block-c-left"></span>
+          <span class="block-c block-c-bottom"></span>
+        </div>
+
+        <div class="container">
+          <div class="time-section">
+            <div id="time"></div>
+            <div id="day"></div>
+          </div>
+          <div class="weather-section">
+            <div class="current-weather">
+              <img id="current-icon" src="assets/icons/clear-day.svg" alt="Weather Icon"/>
+              <div class="temp-stack">
+                <div id="current-temp">--°</div>
+                <div id="high-low">
+                  <div class="hl-row">
+                    <span class="hl-label">H</span>
+                    <span id="high">--°</span>
+                  </div>
+                  <div class="hl-row">
+                    <span class="hl-label">L</span>
+                    <span id="low">--°</span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="hl-row">
-              <span class="hl-label">L</span>
-              <span id="low">--°</span>
-            </div>
+            <div id="forecast" class="forecast"></div>
           </div>
         </div>
-      </div>
-      <div id="forecast" class="forecast"></div>
-    </div>
-  </div>
 
-  	<script src="renderer/clock.js"></script>
-  	<script src="renderer/weather.js"></script>
-	<script src="background-switcher.js"></script>
+      </div>
+
+      <div class="view-layer view-message" aria-hidden="true">
+        <div class="message-screen" id="message-screen">
+          <div id="message-card" class="message-card" hidden>
+            <div id="message-text" class="message-text"></div>
+            <div id="message-meta" class="message-meta"></div>
+            <div class="message-dismiss">Tap message to dismiss</div>
+          </div>
+
+          <div id="message-empty" class="message-empty">No messages</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="renderer/clock.js"></script>
+  <script src="renderer/weather.js"></script>
+  <script src="renderer/messages.js"></script>
+  <script src="background-switcher.js"></script>
 </body>
 </html>

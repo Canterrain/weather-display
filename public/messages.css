@@ -1,0 +1,141 @@
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background:
+    radial-gradient(circle at top, rgba(64, 89, 139, 0.24) 0%, rgba(14, 20, 32, 0.96) 48%, #06080e 100%);
+  color: rgba(246, 250, 255, 0.94);
+  font-family: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+}
+
+body {
+  padding: 24px 16px 48px;
+}
+
+.messages-admin {
+  max-width: 680px;
+  margin: 0 auto;
+  display: grid;
+  gap: 24px;
+}
+
+.compose-panel,
+.active-panel {
+  border-radius: 24px;
+  padding: 22px 18px;
+  background: rgba(16, 23, 37, 0.76);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 12px 30px rgba(0, 0, 0, 0.22);
+}
+
+h1,
+h2 {
+  margin: 0 0 18px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+h1 {
+  font-size: 30px;
+}
+
+h2 {
+  font-size: 24px;
+}
+
+.field,
+.field-row {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.field-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.field span {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(230, 239, 250, 0.78);
+}
+
+textarea,
+input,
+select,
+button {
+  font: inherit;
+}
+
+textarea,
+input,
+select {
+  width: 100%;
+  border: 0;
+  border-radius: 16px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(248, 251, 255, 0.96);
+  box-sizing: border-box;
+}
+
+textarea {
+  min-height: 116px;
+  resize: vertical;
+}
+
+.primary-button {
+  border: 0;
+  border-radius: 999px;
+  padding: 14px 18px;
+  background: linear-gradient(180deg, rgba(107, 155, 255, 0.96), rgba(68, 116, 214, 0.96));
+  color: white;
+  font-weight: 650;
+}
+
+.compose-status {
+  min-height: 20px;
+  margin-top: 10px;
+  font-size: 15px;
+  color: rgba(232, 239, 251, 0.72);
+}
+
+.active-messages {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-message {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.admin-message-text {
+  font-size: 22px;
+  font-weight: 560;
+  line-height: 1.18;
+}
+
+.admin-message-meta {
+  font-size: 15px;
+  color: rgba(224, 234, 247, 0.66);
+}
+
+.admin-message-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.admin-message-actions button {
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(247, 250, 255, 0.94);
+}

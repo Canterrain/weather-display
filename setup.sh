@@ -54,10 +54,22 @@ REPO_URL="${WEATHER_REPO_URL:-https://github.com/Canterrain/weather-display.git}
 # Config prompts
 # -----------------------------------------------------------------------------
 read -r -p "Enter your city (e.g., Cincinnati,OH,US): " city
+read -r -p "Enter a room label for this clock (e.g., Kitchen, Office, Bedroom): " roomName
 read -r -p "Choose time format (12 or 24): " timeFormat
 read -r -p "Choose temperature units (imperial or metric): " units
+echo "Message sharing:"
+echo "1. Just this clock"
+echo "2. Shared with other clocks"
+read -r -p "Choose 1 or 2 [1]: " messageSharingChoice
+echo "Input mode:"
+echo "1. Touchscreen"
+echo "2. Non-touch"
+read -r -p "Choose 1 or 2 [1]: " inputModeChoice
 
 leadingZero12h="true"
+roomName="${roomName:-Clock}"
+messageSharingChoice="${messageSharingChoice:-1}"
+inputModeChoice="${inputModeChoice:-1}"
 
 if [[ "$timeFormat" != "12" && "$timeFormat" != "24" ]]; then
   timeFormat="12"
@@ -65,6 +77,30 @@ fi
 if [[ "$units" != "imperial" && "$units" != "metric" ]]; then
   units="imperial"
 fi
+
+if [[ "$messageSharingChoice" == "2" ]]; then
+  messageSharing="shared"
+else
+  messageSharing="single"
+fi
+
+if [[ "$inputModeChoice" == "2" ]]; then
+  inputMode="non-touch"
+else
+  inputMode="touch"
+fi
+
+deviceId="$(
+  printf '%s' "$roomName" \
+    | tr '[:upper:]' '[:lower:]' \
+    | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//'
+)"
+
+if [[ -z "$deviceId" ]]; then
+  deviceId="clock"
+fi
+
+deviceId="${deviceId}-clock"
 
 if [[ "$timeFormat" == "12" ]]; then
   read -r -p "Show leading zero in 12-hour mode, 07:00 AM instead of 7:00 AM? (Y/n) [Y]: " lz
@@ -311,12 +347,21 @@ cat <<EOF > "$TARGET_DIR/config.json"
   "lon": $lon,
   "timezone": "$tz",
   "units": "$units",
+  "deviceId": "$deviceId",
+  "roomName": "$roomName",
+  "messageSharing": "$messageSharing",
+  "inputMode": "$inputMode",
   "timeFormat": "$timeFormat",
   "leadingZero12h": $leadingZero12h,
   "thundersnowF": 34,
   "thundersnowC": 1,
   "recentSnowHours": 2,
-  "recentSnowMm": 0
+  "recentSnowMm": 0,
+  "recentPrecipMinutes": 60,
+  "recentPrecipMm": 0,
+  "recentSnowMm15": 0,
+  "snowTempF": 34,
+  "snowTempC": 1
 }
 EOF
 
@@ -506,3 +551,5 @@ echo "IMPORTANT:"
 echo "A reboot is required to start the display automatically."
 echo "Run: sudo reboot"
 echo ""
+echo "Phone message page:"
+echo "  http://$(hostname).local:3000/messages"

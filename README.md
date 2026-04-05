@@ -12,6 +12,8 @@ A fullscreen clock and weather dashboard designed for Raspberry Pi and the Wisec
 - Custom SVG weather icons
 - Auto screen rotation to landscape
 - Optional background images with day/night support
+- Local household message page at `/messages`
+- Optional shared household messaging between clocks
 - Auto-start with PM2 on boot
 - Clean, modern layout designed for 1920×480 displays
 - Works on both X11 (Bookworm) and Wayland/labwc (Trixie)
@@ -32,31 +34,42 @@ A fullscreen clock and weather dashboard designed for Raspberry Pi and the Wisec
 
 ## 🚀 Quick Start
 
-* Download the install script
+Download the install script:
 
 ```
 wget https://raw.githubusercontent.com/Canterrain/weather-display/main/setup.sh
 ```
-* Install the software: 
+
+Install the software:
+
 ```
 bash setup.sh
 ```
-* Reboot Raspberry Pi
+
+Reboot Raspberry Pi:
+
 ```
 sudo reboot
+```
+
+During Raspberry Pi OS setup, choose a short, simple hostname for the device, such as `Clock`. That makes the local message page easier to remember later at:
+
+```text
+http://clock.local:3000/messages
 ```
 
 ## What This Script Does
 
 - Installs required system dependencies
 - Installs Node.js 20 LTS
- -Installs and configures the app
+- Installs and configures the app
 - Detects Bookworm vs Trixie automatically
 - Configures screen rotation
 - Configures auto-start:
   - Bookworm (X11): PM2
   - Trixie (Wayland/labwc): labwc autostart
 - Sets up fonts and weather configuration
+- Sets up clock/device identity and message-sharing mode
 - After reboot, the display should launch automatically.
 
 ---
@@ -73,6 +86,10 @@ Example:
   "lon": -xx.xxxx,
   "timezone": "America/New_York",
   "units": "imperial",
+  "deviceId": "kitchen-clock",
+  "roomName": "Kitchen",
+  "messageSharing": "single",
+  "inputMode": "touch",
   "timeFormat": "12",
   "leadingZero12h": true
 }
@@ -92,6 +109,22 @@ Example:
   
   - false → 7:00 AM
 
+### Message Options
+
+- "messageSharing"
+
+  - "single" → this clock uses only its own local messages
+
+  - "shared" → this clock participates in the same household message network as other shared clocks
+
+- "inputMode"
+
+  - "touch" → swipe right to open messages, tap the message to dismiss
+
+  - "non-touch" → unread messages automatically switch to the message screen every 5 minutes for 30 seconds, then return to the main clock screen
+
+These settings only affect how this specific clock behaves locally. The shared household message protocol remains compatible with `round-weather-display`.
+
 ### Weather Behavior
 
 The system uses Open-Meteo’s current_weather field as the primary source.
@@ -103,13 +136,20 @@ Optional tuning values (advanced users):
   "thundersnowF": 34,
   "thundersnowC": 1,
   "recentSnowHours": 2,
-  "recentSnowMm": 0
+  "recentSnowMm": 0,
+  "recentPrecipMinutes": 60,
+  "recentPrecipMm": 0,
+  "recentSnowMm15": 0,
+  "snowTempF": 34,
+  "snowTempC": 1
 }
 ```
 
 - recentSnowHours
 
   If measurable snowfall occurred within this window, the snow icon may persist briefly even if precipitation has just stopped.
+
+Additional advanced tuning is also supported for recent precipitation detection and snow/rain temperature thresholds.
 
 These defaults are conservative and do not fabricate weather data — they only interpret recent official Open-Meteo measurements.
 
@@ -163,6 +203,7 @@ To use your own custom icons:
 | `public/style.css`          | Display styles                               |
 | `public/renderer/clock.js`  | Time and date logic                          |
 | `public/renderer/weather.js`| Weather data fetch & rendering               |
+| `public/renderer/messages.js`| Message screen logic and unread state       |
 | `server.js`                 | Express server for frontend                  |
 | `scripts/rwc.sh`            | PM2 launch script                            |
 | `config.json`               | Created by `setup.sh` for user configuration |
@@ -177,7 +218,21 @@ This project runs as a Node.js server (Express) and is typically launched via PM
 
 For development and testing, you can access the UI directly in a browser:
 
+```text
 http://<pi-ip>:3000/
+```
+
+For everyday use on your home network, the local message entry page is easiest to reach using the Raspberry Pi hostname you chose during Raspberry Pi OS setup:
+
+```text
+http://<hostname>.local:3000/messages
+```
+
+Current screen flow:
+
+- Main clock screen
+- Touchscreen: swipe right → message screen, tap the message to dismiss
+- Non-touch: unread messages automatically switch to the message screen every 5 minutes for 30 seconds, then return to the main clock screen
 
 The following developer-only query parameters are available for testing:
 

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>House Messages</title>
+  <link rel="stylesheet" href="messages.css" />
+</head>
+<body>
+  <main class="messages-admin">
+    <section class="compose-panel">
+      <h1>House Messages</h1>
+      <label class="field">
+        <span>Message</span>
+        <textarea id="msg-text" maxlength="180" placeholder="Dinner is Ready"></textarea>
+      </label>
+      <label class="field">
+        <span>Sender</span>
+        <input id="msg-sender" type="text" maxlength="40" placeholder="Alex" />
+      </label>
+      <div class="field-row">
+        <label class="field">
+          <span>Target</span>
+          <select id="msg-target"></select>
+        </label>
+        <label class="field">
+          <span>Priority</span>
+          <select id="msg-priority">
+            <option value="normal">Normal</option>
+            <option value="important">Important</option>
+          </select>
+        </label>
+      </div>
+      <label class="field">
+        <span>Expires</span>
+        <input id="msg-expires" type="datetime-local" />
+      </label>
+      <button id="send-message" class="primary-button">Send Message</button>
+      <div id="compose-status" class="compose-status" aria-live="polite"></div>
+    </section>
+
+    <section class="active-panel">
+      <h2>Active Messages</h2>
+      <div id="active-messages" class="active-messages"></div>
+    </section>
+  </main>
+
+  <script src="renderer/messages-admin.js"></script>
+</body>
+</html>
