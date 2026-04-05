@@ -121,7 +121,7 @@ Example:
 
   - "touch" → swipe right to open messages, tap the message to dismiss
 
-  - "non-touch" → unread messages automatically switch to the message screen every 5 minutes for 30 seconds, then return to the main clock screen
+  - "non-touch" → unread messages automatically switch to the message screen every 3 minutes for 30 seconds, then return to the main clock screen
 
 These settings only affect how this specific clock behaves locally. The shared household message protocol remains compatible with `round-weather-display`.
 
@@ -232,7 +232,7 @@ Current screen flow:
 
 - Main clock screen
 - Touchscreen: swipe right → message screen, tap the message to dismiss
-- Non-touch: unread messages automatically switch to the message screen every 5 minutes for 30 seconds, then return to the main clock screen
+- Non-touch: unread messages automatically switch to the message screen every 3 minutes for 30 seconds, then return to the main clock screen
 
 The following developer-only query parameters are available for testing:
 
