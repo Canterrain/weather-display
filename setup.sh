@@ -421,30 +421,6 @@ EOF
 }
 
 # -----------------------------------------------------------------------------
-# Wayland helpers
-# -----------------------------------------------------------------------------
-create_wayland_helpers() {
-  cat <<'EOF' > "$TARGET_DIR/scripts/rotate_wayland.sh"
-#!/usr/bin/env bash
-set -euo pipefail
-
-if ! command -v wlr-randr >/dev/null 2>&1; then
-  exit 0
-fi
-
-out="$(wlr-randr | awk '
-  /^[^ ]/ {o=$1}
-  /Enabled: yes/ {print o; exit}
-')"
-
-if [[ -n "${out:-}" ]]; then
-  wlr-randr --output "$out" --transform 90 || true
-fi
-EOF
-  chmod +x "$TARGET_DIR/scripts/rotate_wayland.sh"
-}
-
-# -----------------------------------------------------------------------------
 # Autostart configuration
 # -----------------------------------------------------------------------------
 configure_labwc_wayland() {
@@ -492,7 +468,7 @@ XML
     grep -Fqx "$line" "$aut" 2>/dev/null || echo "$line" >> "$aut"
   }
 
-  add_line "bash \"$TARGET_DIR/scripts/rotate_wayland.sh\" &"
+  add_line "bash \"$TARGET_DIR/rotate_display.sh\" &"
   add_line "wtype -M alt -M logo h -m alt -m logo &"
   add_line "bash \"$TARGET_DIR/scripts/rwc.sh\" &"
 
@@ -523,7 +499,6 @@ if [[ "$SESSION_TYPE" == "wayland" ]]; then
   # Don't rely on PM2 boot services on labwc
   sudo systemctl disable pm2-"$USER" >/dev/null 2>&1 || true
 
-  create_wayland_helpers
   configure_labwc_wayland
 else
   setup_x11_rotation_service
