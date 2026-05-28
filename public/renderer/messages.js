@@ -1,5 +1,5 @@
 const MESSAGE_POLL_INTERVAL_MS = 15 * 1000;
-const NON_TOUCH_INTERVAL_MS = 3 * 60 * 1000;
+const NON_TOUCH_INTERVAL_MS = 150 * 1000;
 const NON_TOUCH_DURATION_MS = 30 * 1000;
 
 const VIEW_MODES = {
@@ -163,8 +163,13 @@ async function fetchMessages() {
     messageState.activeMessage = messageState.messages[0] || null;
 
     if (messageState.activeMessage?.id !== previousActiveId) {
-      messageState.messageVisibleUntil = 0;
-      messageState.nextResurfaceAt = 0;
+      if (messageState.inputMode === 'non-touch' && messageState.activeMessage) {
+        messageState.messageVisibleUntil = Date.now() + NON_TOUCH_DURATION_MS;
+        messageState.nextResurfaceAt = Date.now() + NON_TOUCH_INTERVAL_MS;
+      } else {
+        messageState.messageVisibleUntil = 0;
+        messageState.nextResurfaceAt = 0;
+      }
     }
 
     if (messageState.inputMode === 'non-touch') {
