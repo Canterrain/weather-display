@@ -36,3 +36,5 @@ public/assets/background-night.webp
 # Optional icon themes and local backups
 public/assets/icon-themes/
 public/assets/icons.base/
+config.json
+messages.json
