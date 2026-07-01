@@ -9,7 +9,10 @@ A fullscreen clock and weather dashboard designed for Raspberry Pi and the Wisec
 - Digital clock with configurable 12h or 24h format
 - Day/date display
 - Real-time weather via Open-Meteo (no API key required)
+- Smarter forecast icons based on how most of the day looks, not just one noisy daily weather code
+- Subtle stale weather indicator if Open-Meteo is temporarily unavailable
 - Custom SVG weather icons
+- Optional red nightshift mode for a dimmer nighttime display
 - Auto screen rotation to landscape
 - Optional background images with day/night support
 - Local household message page at `/messages`
@@ -68,7 +71,7 @@ http://clock.local:3000/messages
 - Configures auto-start:
   - Bookworm (X11): PM2
   - Trixie (Wayland/labwc): labwc autostart
-- Sets up fonts and weather configuration
+- Sets up fonts, weather configuration, and optional nightshift settings
 - Sets up clock/device identity and message-sharing mode
 - After reboot, the display should launch automatically.
 
@@ -91,7 +94,10 @@ Example:
   "messageSharing": "single",
   "inputMode": "touch",
   "timeFormat": "12",
-  "leadingZero12h": true
+  "leadingZero12h": true,
+  "nightShift": false,
+  "nightShiftStart": "22:00",
+  "nightShiftEnd": "06:00"
 }
 ```
 
@@ -108,6 +114,25 @@ Example:
   - true → 07:00 AM
   
   - false → 7:00 AM
+
+### Night Options
+
+- "nightShift"
+
+  - false → normal color mode all day
+
+  - true → switches to a dim red text mode during the configured night window
+
+- "nightShiftStart"
+- "nightShiftEnd"
+
+  Example:
+
+  - "22:00" → 10:00 PM
+
+  - "06:00" → 6:00 AM
+
+This mode is optional and is meant to make the display feel more like a night clock, not an alert screen.
 
 ### Message Options
 
@@ -127,9 +152,24 @@ These settings only affect how this specific clock behaves locally. The shared h
 
 ### Weather Behavior
 
-The system uses Open-Meteo’s current_weather field as the primary source.
+The system uses Open-Meteo’s `current_weather` field as the primary source for current conditions, then applies a few small corrections to make the display behave more like a real household weather clock.
 
-Optional tuning values (advanced users):
+Current weather behavior:
+
+- The display prefers recent observed precipitation over a stale-looking current icon
+- Recent snow can briefly keep the snow icon visible even after precipitation has just stopped
+- If Open-Meteo temporarily fails, the server will keep serving the last known good weather payload instead of going blank
+- When that happens, the frontend shows a subtle stale weather message so you know the display is running on cached data
+
+Forecast behavior:
+
+- Daily high and low temperatures still come from Open-Meteo daily data
+- Forecast icons do not blindly use Open-Meteo’s daily `weathercode`
+- Instead, the clock looks at daytime hourly conditions, roughly 8 AM through 8 PM, and picks a representative icon based on what most of the day looks like
+- This helps avoid days showing as thunderstorms just because one small forecast window contains storm risk
+- The raw Open-Meteo daily code is still included internally as `dailyCode` for debugging, but the displayed forecast icon uses the representative daytime code
+
+Optional tuning values (advanced users) are still supported:
 
 ```
 {
@@ -151,7 +191,7 @@ Optional tuning values (advanced users):
 
 Additional advanced tuning is also supported for recent precipitation detection and snow/rain temperature thresholds.
 
-These defaults are conservative and do not fabricate weather data — they only interpret recent official Open-Meteo measurements.
+These defaults are conservative and do not fabricate weather data — they only reinterpret recent official Open-Meteo measurements in a way that tends to look more like a normal consumer weather display.
 
 ## 🖼️ Custom Backgrounds
 
