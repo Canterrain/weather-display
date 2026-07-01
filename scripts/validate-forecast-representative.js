@@ -40,6 +40,28 @@ function runCase(name, input, expectedCode) {
 const date = '2026-07-02';
 
 runCase(
+  'dry thunder codes stay cloudy or partly cloudy',
+  {
+    date,
+    dailyCode: 95,
+    dailyHigh: 99,
+    dailyLow: 73,
+    snowTempThreshold: 34,
+    hourly: buildHourly({
+      date,
+      hours: [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+      code: (hour) => ([10, 12, 13].includes(hour) ? 95 : (hour === 11 || hour === 14 ? 3 : 0)),
+      precipitationProbability: (hour) => ({ 10: 1, 11: 1, 12: 1, 13: 1, 14: 2, 15: 3, 16: 2, 17: 1, 18: 3, 19: 6, 20: 2 }[hour] ?? 0),
+      precipitation: 0,
+      rain: 0,
+      showers: 0,
+      cloudCover: (hour) => ({ 8: 8, 9: 6, 10: 81, 11: 100, 12: 82, 13: 87, 14: 100, 15: 66, 16: 28, 17: 5, 18: 6, 19: 3, 20: 3 }[hour] ?? 0)
+    })
+  },
+  2
+);
+
+runCase(
   'brief thunder risk stays partly cloudy',
   {
     date,

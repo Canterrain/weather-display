@@ -3,7 +3,10 @@ const DAYTIME_END_HOUR = 20;
 
 const FORECAST_HEURISTIC_THRESHOLDS = {
   thunderHours: 2,
+  thunderWetHours: 2,
+  thunderProbabilityModerate: 35,
   thunderProbability: 60,
+  thunderTotalMm: 0.5,
   rainHours: 3,
   rainProbability: 60,
   rainTotalMm: 1.5,
@@ -166,10 +169,20 @@ function pickRepresentativeForecastCode({
   const coldEnoughForSnow = Number.isFinite(snowTempThreshold) && midTemp <= snowTempThreshold;
 
   if (
-    summary.thunderHours >= FORECAST_HEURISTIC_THRESHOLDS.thunderHours ||
+    (
+      summary.thunderHours >= FORECAST_HEURISTIC_THRESHOLDS.thunderHours &&
+      (
+        summary.wetHours >= FORECAST_HEURISTIC_THRESHOLDS.thunderWetHours ||
+        summary.totalPrecipitation >= FORECAST_HEURISTIC_THRESHOLDS.thunderTotalMm ||
+        summary.maxPrecipitationProbability >= FORECAST_HEURISTIC_THRESHOLDS.thunderProbabilityModerate
+      )
+    ) ||
     (
       summary.thunderHours >= 1 &&
-      summary.wetHours >= 2 &&
+      (
+        summary.wetHours >= 1 ||
+        summary.totalPrecipitation > 0
+      ) &&
       summary.maxPrecipitationProbability >= FORECAST_HEURISTIC_THRESHOLDS.thunderProbability
     )
   ) {
