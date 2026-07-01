@@ -5,6 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const dgram = require('dgram');
+const { pickRepresentativeForecastCode } = require('./forecast-representative');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -644,6 +645,9 @@ app.get('/config', (req, res) => {
     timeFormat: cfg.timeFormat || cfg.clockFormat || cfg.format || null,
     leadingZero12h: typeof cfg.leadingZero12h === 'boolean' ? cfg.leadingZero12h : true,
     units: cfg.units || null,
+    nightShift: cfg.nightShift === true,
+    nightShiftStart: typeof cfg.nightShiftStart === 'string' ? cfg.nightShiftStart : '22:00',
+    nightShiftEnd: typeof cfg.nightShiftEnd === 'string' ? cfg.nightShiftEnd : '06:00',
     deviceId: cfg.deviceId || null,
     roomName: cfg.roomName || null,
     messageSharing: cfg.messageSharing || 'single',
@@ -805,9 +809,9 @@ app.get('/weather', async (req, res) => {
       `?latitude=${encodeURIComponent(cfg.lat)}` +
       `&longitude=${encodeURIComponent(cfg.lon)}` +
       `&current_weather=true` +
-      `&hourly=weathercode,snowfall` +
+      `&hourly=weathercode,precipitation_probability,precipitation,rain,showers,snowfall,cloud_cover` +
       `&minutely_15=precipitation,snowfall` +
-      `&daily=sunrise,sunset,temperature_2m_max,temperature_2m_min,weathercode` +
+      `&daily=time,sunrise,sunset,temperature_2m_max,temperature_2m_min,weathercode` +
       `&temperature_unit=${encodeURIComponent(tempUnit)}` +
       `&timezone=${encodeURIComponent(cfg.timezone || 'auto')}` +
       `&forecast_days=${forecastDays}`;
@@ -860,32 +864,46 @@ app.get('/weather', async (req, res) => {
     const fixedLow = lowToday == null ? currentTemp : Math.min(lowToday, currentTemp);
     const sunriseToday = safeDailyValue(daily.sunrise, 0) || null;
     const sunsetToday = safeDailyValue(daily.sunset, 0) || null;
+    const snowTempThreshold = getTempThresholdForSnow(cfg, tempUnit);
 
     const forecast = [];
     for (let i = 1; i <= 5; i++) {
       const maxRaw = safeDailyValue(daily.temperature_2m_max, i);
       const minRaw = safeDailyValue(daily.temperature_2m_min, i);
       const codeRaw = safeDailyValue(daily.weathercode, i);
+      const dayDate = safeDailyValue(daily.time, i) || String(safeDailyValue(daily.sunrise, i) || '').slice(0, 10);
 
-      if (maxRaw == null || minRaw == null || codeRaw == null) continue;
+      if (maxRaw == null || minRaw == null || codeRaw == null || !dayDate) continue;
 
       const max = Math.round(maxRaw);
       const min = Math.round(minRaw);
       const mid = Math.round((max + min) / 2);
-      const code = Number(codeRaw);
+      const dailyCode = Number(codeRaw);
+      const representative = pickRepresentativeForecastCode({
+        date: dayDate,
+        dailyCode,
+        dailyHigh: max,
+        dailyLow: min,
+        hourly,
+        snowTempThreshold
+      });
+      const code = Number(representative.code);
       const thundersnow = isThundersnow(cfg, code, mid, tempUnit);
 
       forecast.push({
         temp: max,
         high: max,
         low: min,
+        dailyCode,
         code,
         is_day: true,
         thundersnow
       });
     }
 
+    const updatedAt = new Date().toISOString();
     const payload = {
+      updatedAt,
       current: {
         temp: currentTemp,
         high: fixedHigh,

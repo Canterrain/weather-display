@@ -1,14 +1,45 @@
+const WEATHER_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
+
+function setWeatherStatus(message) {
+  const el = document.getElementById('weather-status');
+  if (!el) return;
+
+  if (!message) {
+    el.hidden = true;
+    el.textContent = '';
+    return;
+  }
+
+  el.hidden = false;
+  el.textContent = message;
+}
+
+function formatAgeMs(ageMs) {
+  if (!Number.isFinite(ageMs) || ageMs < 0) return '';
+
+  const minuteMs = 60 * 1000;
+  const hourMs = 60 * minuteMs;
+  const dayMs = 24 * hourMs;
+
+  if (ageMs >= dayMs) return `${Math.round(ageMs / dayMs)}d ago`;
+  if (ageMs >= hourMs) return `${Math.round(ageMs / hourMs)}h ago`;
+
+  const minutes = Math.max(1, Math.round(ageMs / minuteMs));
+  return `${minutes}m ago`;
+}
+
 async function fetchWeather() {
   try {
-    const response = await fetch('/weather');
+    const response = await fetch('/weather', { cache: 'no-store' });
     const data = await response.json();
 
     if (data.error) {
       console.error('Weather fetch error:', data.error);
+      setWeatherStatus('Weather data stale');
       return;
     }
 
-    const { current, forecast } = data;
+    const { current, forecast, stale, staleAgeMs, updatedAt } = data;
 
     // Update current weather
     document.getElementById('current-temp').textContent = `${current.temp}°`;
@@ -40,8 +71,18 @@ async function fetchWeather() {
       forecastContainer.appendChild(dayDiv);
     });
 
+    if (stale) {
+      const updatedAtMs = Date.parse(updatedAt);
+      const derivedAgeMs = Number.isFinite(updatedAtMs) ? Date.now() - updatedAtMs : staleAgeMs;
+      const ageLabel = formatAgeMs(derivedAgeMs);
+      setWeatherStatus(ageLabel ? `Weather updated ${ageLabel}` : 'Weather data stale');
+    } else {
+      setWeatherStatus('');
+    }
+
   } catch (error) {
     console.error('Weather fetch failed:', error);
+    setWeatherStatus('Weather data stale');
   }
 }
 
@@ -91,4 +132,4 @@ function mapIconFromMeteo(code, isDay, thundersnow) {
 }
 
 fetchWeather();
-setInterval(fetchWeather, 30 * 60 * 1000);
+setInterval(fetchWeather, WEATHER_REFRESH_INTERVAL_MS);

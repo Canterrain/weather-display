@@ -1,6 +1,17 @@
 let CLOCK_CFG = {
   timeFormat: '12',
-  leadingZero12h: true
+  leadingZero12h: true,
+  nightShift: false,
+  nightShiftStart: '22:00',
+  nightShiftEnd: '06:00'
+};
+
+const CLOCK_STALE_WARNING_MS = 2 * 60 * 1000 + 15 * 1000;
+
+const clockHealth = {
+  lastRenderAt: 0,
+  lastDisplayedMinuteKey: '',
+  lastMinuteAdvanceAt: 0
 };
 
 async function loadClockConfig() {
@@ -11,10 +22,93 @@ async function loadClockConfig() {
     if (data && typeof data === 'object') {
       if (data.timeFormat) CLOCK_CFG.timeFormat = String(data.timeFormat);
       if (typeof data.leadingZero12h === 'boolean') CLOCK_CFG.leadingZero12h = data.leadingZero12h;
+      if (typeof data.nightShift === 'boolean') CLOCK_CFG.nightShift = data.nightShift;
+      if (typeof data.nightShiftStart === 'string') CLOCK_CFG.nightShiftStart = data.nightShiftStart;
+      if (typeof data.nightShiftEnd === 'string') CLOCK_CFG.nightShiftEnd = data.nightShiftEnd;
     }
   } catch (e) {
     // ignore; fall back to defaults
   }
+}
+
+function setClockStatus(message) {
+  const el = document.getElementById('clock-status');
+  if (!el) return;
+
+  if (!message) {
+    el.hidden = true;
+    el.textContent = '';
+    return;
+  }
+
+  el.hidden = false;
+  el.textContent = message;
+}
+
+function parseTimeParts(value) {
+  if (typeof value !== 'string') return null;
+  const match = value.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null;
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+
+function isNightShiftActive(now = new Date()) {
+  if (!CLOCK_CFG.nightShift) return false;
+
+  const startMinutes = parseTimeParts(CLOCK_CFG.nightShiftStart);
+  const endMinutes = parseTimeParts(CLOCK_CFG.nightShiftEnd);
+  if (startMinutes == null || endMinutes == null) return false;
+
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+  if (startMinutes === endMinutes) return true;
+  if (startMinutes < endMinutes) {
+    return nowMinutes >= startMinutes && nowMinutes < endMinutes;
+  }
+
+  return nowMinutes >= startMinutes || nowMinutes < endMinutes;
+}
+
+function applyNightShiftClass() {
+  document.body.classList.toggle('night-shift-red', isNightShiftActive());
+}
+
+function isDashboardVisible() {
+  const shell = document.querySelector('.app-shell');
+  return !!shell && shell.classList.contains('mode-dashboard');
+}
+
+function resetClockHealth() {
+  const now = Date.now();
+  clockHealth.lastRenderAt = now;
+  clockHealth.lastMinuteAdvanceAt = now;
+  clockHealth.lastDisplayedMinuteKey = '';
+  setClockStatus('');
+}
+
+function updateClockHealth(now, minuteKey) {
+  const renderAt = now.getTime();
+  clockHealth.lastRenderAt = renderAt;
+
+  if (minuteKey !== clockHealth.lastDisplayedMinuteKey) {
+    clockHealth.lastDisplayedMinuteKey = minuteKey;
+    clockHealth.lastMinuteAdvanceAt = renderAt;
+  }
+}
+
+function updateClockStaleWarning() {
+  if (document.hidden || !isDashboardVisible()) {
+    resetClockHealth();
+    return;
+  }
+
+  const staleForMs = Date.now() - clockHealth.lastMinuteAdvanceAt;
+  setClockStatus(staleForMs > CLOCK_STALE_WARNING_MS ? 'Clock paused' : '');
 }
 
 function CountdownTracker(label, value) {
@@ -114,7 +208,9 @@ function Clock() {
   }
 
   function updateClock() {
+    const now = new Date();
     const t = getTime();
+    const minuteKey = `${now.getHours()}:${now.getMinutes()}`;
 
     // Hours formatting:
     // - 24h: keep 2-digit (00-23)
@@ -134,6 +230,9 @@ function Clock() {
     }
 
     trackers.Minutes.update(t.Minutes);
+    updateClockHealth(now, minuteKey);
+    updateClockStaleWarning();
+    applyNightShiftClass();
   }
 
   function updateDay() {
@@ -151,6 +250,7 @@ function Clock() {
   setAmPmVisibility();
   updateClock();
   updateDay();
+  applyNightShiftClass();
 
   setInterval(updateClock, 1000);
   setInterval(updateDay, 60 * 1000);
@@ -159,7 +259,17 @@ function Clock() {
   setInterval(async () => {
     await loadClockConfig();
     setAmPmVisibility();
+    applyNightShiftClass();
   }, 10 * 60 * 1000);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      resetClockHealth();
+      return;
+    }
+
+    updateClock();
+  });
 }
 
 // Boot

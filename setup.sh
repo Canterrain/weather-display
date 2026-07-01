@@ -65,11 +65,14 @@ echo "Input mode:"
 echo "1. Touchscreen"
 echo "2. Non-touch"
 read -r -p "Choose 1 or 2 [1]: " inputModeChoice
+read -r -p "Enable red nightshift mode, dim red text from 22:00 to 06:00? (y/N) [N]: " nightShiftChoice
 
 leadingZero12h="true"
+nightShift="false"
 roomName="${roomName:-Clock}"
 messageSharingChoice="${messageSharingChoice:-1}"
 inputModeChoice="${inputModeChoice:-1}"
+nightShiftChoice="${nightShiftChoice:-N}"
 
 if [[ "$timeFormat" != "12" && "$timeFormat" != "24" ]]; then
   timeFormat="12"
@@ -89,6 +92,11 @@ if [[ "$inputModeChoice" == "2" ]]; then
 else
   inputMode="touch"
 fi
+
+case "$nightShiftChoice" in
+  Y|y) nightShift="true" ;;
+  *)   nightShift="false" ;;
+esac
 
 deviceId="$(
   printf '%s' "$roomName" \
@@ -353,6 +361,9 @@ cat <<EOF > "$TARGET_DIR/config.json"
   "inputMode": "$inputMode",
   "timeFormat": "$timeFormat",
   "leadingZero12h": $leadingZero12h,
+  "nightShift": $nightShift,
+  "nightShiftStart": "22:00",
+  "nightShiftEnd": "06:00",
   "thundersnowF": 34,
   "thundersnowC": 1,
   "recentSnowHours": 2,

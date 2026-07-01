@@ -12,6 +12,9 @@
 
   "timeFormat": "12",
   "leadingZero12h": true,
+  "nightShift": false,
+  "nightShiftStart": "22:00",
+  "nightShiftEnd": "06:00",
 
   "thundersnowF": 34,
   "thundersnowC": 1,
