@@ -153,6 +153,10 @@ body.night-shift-red {
   --text-status: var(--night-shift-status);
 }
 
+body.night-shift-red .weather-section {
+  display: none;
+}
+
 /* Ensure UI renders above scrim */
 .container {
   position: relative;
