@@ -4,8 +4,7 @@ A fullscreen clock and weather dashboard designed for Raspberry Pi and the Wisec
 
 ## 🎥 Demo
 
-[![Watch the Clock Weather Display video](https://github.com/user-attachments/assets/b909da12-5851-4d60-9017-aa0ce8f040c7)](https://www.youtube.com/watch?v=MFlw5Dr3YB)
-
+[![Watch the Clock Weather Display video](https://github.com/user-attachments/assets/b909da12-5851-4d60-9017-aa0ce8f040c7)](https://www.youtube.com/watch?v=MFlw5Dr3YBI)
 **Click the image above to see more about this project on Youtube.**
 
 ## ✨ Features
