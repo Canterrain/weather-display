@@ -1,6 +1,6 @@
 # Clock Weather Display
 
-A fullscreen clock and weather dashboard designed for Raspberry Pi and the Wisecoco 8.8" IPS HDMI display. The UI pulls real-time weather data from Open-Meteo and works great mounted under cabinets or as a minimalist desk display.
+A fullscreen clock and weather dashboard designed for Raspberry Pi and 8.8" HDMI displays including Wisecoco, SCXryllexa, and Hosyond options. The UI pulls real-time weather data from Open-Meteo and works great mounted under cabinets or as a minimalist desk display.
 
 ## 🎥 Demo
 
@@ -29,14 +29,32 @@ A fullscreen clock and weather dashboard designed for Raspberry Pi and the Wisec
 - [Raspberry Pi 4](https://amzn.to/40en56s) (affiliate)
 - or
 - [Raspberry Pi 5](https://amzn.to/3ZEJUQH) (affiliate)
+- Raspberry Pi Zero 2 W now fully supported (Bookworm only, 64-bit recommended)
+- Not recommended for Trixie (Wayland)
+- Zero 2 requires a different HDMI adapter and a dedicated power supply for the display
 - Raspberry Pi 3B may work on Bookworm only (not recommended for Trixie)
-- [Rasperry Pi Power Supply](https://amzn.to/3MvrPBF) (affiliate)
+- [Raspberry Pi Power Supply](https://amzn.to/3MvrPBF) (affiliate)
+
+Display options:
+
 - [Wisecoco HDMI display](https://amzn.to/4cuofSN) (affiliate)
-- [Micro HDMI to HDMI adapter](https://amzn.to/3ZyFOJZ) (affiliate)
+- [Micro HDMI to HDMI adapter for Wisecoco](https://amzn.to/3ZyFOJZ) (affiliate)
+- Wisecoco includes the HDMI and USB cables needed for the screen itself.
+- Note: I have had enough reports of defective Wisecoco panels that I also added confirmed alternative display options below.
+- [SCXryllexa HDMI Touch Display](https://amzn.to/3MJLldR) (affiliate)
+- [Micro HDMI to HDMI adapter for SCXryllexa](https://amzn.to/3N53Vgs) (affiliate)
+- [Hosyond HDMI Touch Display](https://link.amazon/B0bgzKTuM) (affiliate)
+- Hosyond uses a full-size HDMI port, so no micro HDMI adapter is required.
+
 - Raspberry Pi OS 64-bit:
   - Bookworm (X11 or Wayland)
   - Trixie (Wayland/labwc default)
-- 3D Printed case ([Free STL Here](https://makerworld.com/en/models/2394718-under-cabinet-weather-clock-case#profileId-2623970))
+
+3D printed case options:
+
+- Wisecoco case ([MakerWorld STL](https://makerworld.com/en/models/2394718-under-cabinet-weather-clock-case#profileId-2623970))
+- SCXryllexa case ([MakerWorld STL](https://makerworld.com/en/models/2483526-under-cabinet-weather-clock-case-other-display))
+- Hosyond case ([MakerWorld STL](https://makerworld.com/en/models/3107478-under-cabinet-weather-clock-case-hysond-display))
 
 ## 🚀 Quick Start
 
