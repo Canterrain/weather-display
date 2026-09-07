@@ -29,7 +29,8 @@ A fullscreen clock and weather dashboard designed for Raspberry Pi and 8.8" HDMI
 - [Raspberry Pi 4](https://amzn.to/40en56s) (affiliate)
 - or
 - [Raspberry Pi 5](https://amzn.to/3ZEJUQH) (affiliate)
-- Raspberry Pi Zero 2 W now fully supported (Bookworm only, 64-bit recommended)
+- [Raspberry Pi Zero 2 W](https://seeedtechnologycoltd.sjv.io/QYvqYA)
+  now fully supported (Bookworm only, 64-bit recommended)
 - Not recommended for Trixie (Wayland)
 - Zero 2 requires a different HDMI adapter and a dedicated power supply for the display
 - Raspberry Pi 3B may work on Bookworm only (not recommended for Trixie)
